@@ -96,6 +96,19 @@ class X86Emitter
     }
 
     /**
+     * Emits a forward conditional jump (jne rel32) with a placeholder offset
+     * to be patched later via patchForwardJump().
+     */
+    public function emitJne_ForwardPlaceholder(): int
+    {
+        $this->textSection .= "\x0F\x85"; // jne rel32
+        $offset = strlen($this->textSection);
+        $this->textSection .= "\x00\x00\x00\x00";
+
+        return $offset;
+    }
+
+    /**
      * Emits an unconditional backward jump (jmp rel32) to $target.
      */
     public function emitJmp_Backward(int $target): void
