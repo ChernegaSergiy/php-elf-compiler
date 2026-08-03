@@ -20,7 +20,7 @@ class CompilerApplication
     public function run(array $argv): int
     {
         if (php_sapi_name() !== 'cli') {
-            echo "Запускати лише з термінала.\n";
+            echo "Must be run from the terminal.\n";
 
             return 1;
         }
@@ -28,14 +28,14 @@ class CompilerApplication
         $args = array_slice($argv, 1);
         if (empty($args) || in_array('--help', $args, true) || in_array('-h', $args, true)) {
             echo "Trypillia AOT Compiler v0.3\n";
-            echo "Використання: trypillia <файл.try> [-o <app>]\n";
+            echo "Usage: trypillia <file.try> [-o <app>]\n";
 
             return 0;
         }
 
         $inputFile = $args[0];
         if (!file_exists($inputFile)) {
-            echo "❌ Файл '$inputFile' не знайдено.\n";
+            echo "❌ File '$inputFile' not found.\n";
 
             return 1;
         }
@@ -48,7 +48,7 @@ class CompilerApplication
         }
 
         $source = file_get_contents($inputFile);
-        echo "⚙️  Компіляція: $inputFile -> ./$outputFile\n";
+        echo "⚙️  Compiling: $inputFile -> ./$outputFile\n";
         $startTime = microtime(true);
 
         try {
@@ -58,11 +58,11 @@ class CompilerApplication
             Compiler::compile($ast, $outputFile);
 
             $timeTaken = round((microtime(true) - $startTime) * 1000, 2);
-            echo "✅ Зібрано за {$timeTaken} мс.\n🚀 Запуск: ./$outputFile\n";
+            echo "✅ Built in {$timeTaken} ms.\n🚀 Run: ./$outputFile\n";
 
             return 0;
         } catch (Exception $e) {
-            echo "\n❌ ПОМИЛКА: " . $e->getMessage() . "\n";
+            echo "\n❌ ERROR: " . $e->getMessage() . "\n";
 
             return 1;
         }
