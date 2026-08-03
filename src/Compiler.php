@@ -98,6 +98,9 @@ class Compiler
             } elseif ($node->op === '<') {
                 $emitter->emitCmpRaxRdx();
                 $emitter->emitSetlRax();
+            } elseif ($node->op === '==') {
+                $emitter->emitCmpRaxRdx();
+                $emitter->emitSeteRax();
             }
         }
     }
