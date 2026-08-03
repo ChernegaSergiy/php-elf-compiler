@@ -13,7 +13,6 @@ class X86EmitterTest extends TestCase
     private function textSectionOf(X86Emitter $emitter): string
     {
         $property = new ReflectionProperty(X86Emitter::class, 'textSection');
-        $property->setAccessible(true);
 
         return $property->getValue($emitter);
     }
