@@ -283,18 +283,68 @@ class Compiler {
 }
 
 // ==========================================
-// 5. ВИКОРИСТАННЯ
+// 5. CLI ІНТЕРФЕЙС КОМПІЛЯТОРА
 // ==========================================
-$source = '
-    let a = 15;
-    let b = 27;
-    print "Привіт з нативного бінарника Trypillia!";
-';
 
-echo "Компілюємо повноцінну програму...\n";
-$tokens = Lexer::run($source);
-$parser = new Parser($tokens);
-$ast = $parser->parse();
+if (php_sapi_name() !== 'cli') {
+    die("Цей скрипт можна запускати лише з термінала.\n");
+}
 
-Compiler::compile($ast, "trypillia_app");
-echo "Готово! Створено нативний ELF бінарник: ./trypillia_app\n";
+$args = array_slice($argv, 1);
+
+// Вивід довідки
+if (empty($args) || in_array('--help', $args) || in_array('-h', $args)) {
+    echo "Trypillia AOT Compiler v0.1\n\n";
+    echo "Використання:\n";
+    echo "  php compiler.php <вхідний_файл.try> [-o <вихідний_файл>]\n\n";
+    echo "Приклади:\n";
+    echo "  php compiler.php main.try\n";
+    echo "  php compiler.php main.try -o my_app\n";
+    exit(0);
+}
+
+$inputFile = $args[0];
+
+// Визначаємо ім'я вихідного файлу
+$outputFile = 'app';
+$oIndex = array_search('-o', $args);
+if ($oIndex !== false && isset($args[$oIndex + 1])) {
+    $outputFile = $args[$oIndex + 1];
+} else {
+    // Якщо -o не вказано, беремо ім'я вхідного файлу без розширення
+    $pathInfo = pathinfo($inputFile);
+    $outputFile = $pathInfo['filename'] ?: 'app';
+}
+
+// Перевірка наявності файлу
+if (!file_exists($inputFile)) {
+    echo "❌ Помилка: Файл '$inputFile' не знайдено.\n";
+    exit(1);
+}
+
+$source = file_get_contents($inputFile);
+
+echo "⚙️  Компіляція: $inputFile -> ./$outputFile\n";
+$startTime = microtime(true);
+
+try {
+    // Фаза 1: Лексичний аналіз
+    $tokens = Lexer::run($source);
+    
+    // Фаза 2: Синтаксичний аналіз (AST)
+    $parser = new Parser($tokens);
+    $ast = $parser->parse();
+    
+    // Фаза 3: Генерація машинного коду та збірка ELF
+    Compiler::compile($ast, $outputFile);
+    
+    $timeTaken = round(($endTime = microtime(true) - $startTime) * 1000, 2);
+    
+    echo "✅ Успіх! Зібрано за {$timeTaken} мс.\n";
+    echo "🚀 Запуск: ./$outputFile\n";
+    
+} catch (Exception $e) {
+    echo "\n❌ КРИТИЧНА ПОМИЛКА КОМПІЛЯЦІЇ:\n";
+    echo $e->getMessage() . "\n";
+    exit(1);
+}
