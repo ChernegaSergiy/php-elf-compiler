@@ -71,4 +71,20 @@ class CompilerIntegrationTest extends TestCase
         $expected = "Обчислення Фібоначчі:\n1\n1\n2\n3\n5\n8\n13\n21\n34\n55\n89\nЗавершено!\n";
         $this->assertSame($expected, $output);
     }
+
+    public function testCompilesAndRunsIfElseBranching(): void
+    {
+        $this->compile('
+            let x = 10;
+            if x < 20 {
+                print "less";
+            } else {
+                print "greater";
+            }
+        ');
+
+        $output = shell_exec(escapeshellarg($this->binaryPath));
+
+        $this->assertSame("less\n", $output);
+    }
 }
