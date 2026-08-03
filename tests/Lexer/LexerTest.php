@@ -81,4 +81,14 @@ class LexerTest extends TestCase
 
         Lexer::run('let a = 1 # 2;');
     }
+
+    public function testTokenizesEqualsOperator(): void
+    {
+        $tokens = Lexer::run('a == b');
+
+        $this->assertSame(
+            [TokenType::IDENTIFIER, TokenType::EQUALS, TokenType::IDENTIFIER, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
 }
