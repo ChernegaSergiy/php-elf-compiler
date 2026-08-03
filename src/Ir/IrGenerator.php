@@ -20,7 +20,7 @@ use Exception;
 /**
  * Converts AST to architecture-agnostic three-address style IR.
  */
-class IRGenerator
+class IrGenerator
 {
     private int $tempCounter = 0;
 

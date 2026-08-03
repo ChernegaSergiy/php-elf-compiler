@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace ChernegaSergiy\TrypilliaCompiler\Tests\Ir;
 
-use ChernegaSergiy\TrypilliaCompiler\Ir\IRGenerator;
+use ChernegaSergiy\TrypilliaCompiler\Ir\IrGenerator;
 use ChernegaSergiy\TrypilliaCompiler\Lexer\Lexer;
 use ChernegaSergiy\TrypilliaCompiler\Parser\Parser;
 use PHPUnit\Framework\TestCase;
 
-class IRGeneratorTest extends TestCase
+class IrGeneratorTest extends TestCase
 {
     /**
      * @return array<int, array{opcode: string, result: ?string, operands: array<int, int|string>}>
@@ -17,7 +17,7 @@ class IRGeneratorTest extends TestCase
     private function generateInstructions(string $source): array
     {
         $ast = (new Parser(Lexer::run($source)))->parse();
-        $program = (new IRGenerator())->generate($ast);
+        $program = (new IrGenerator())->generate($ast);
 
         return array_map(
             static fn ($instruction): array => [

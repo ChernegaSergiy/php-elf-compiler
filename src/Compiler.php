@@ -7,7 +7,7 @@ namespace ChernegaSergiy\TrypilliaCompiler;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;
 use ChernegaSergiy\TrypilliaCompiler\Backend\Architecture;
 use ChernegaSergiy\TrypilliaCompiler\Backend\X86BackendEmitter;
-use ChernegaSergiy\TrypilliaCompiler\Ir\IRGenerator;
+use ChernegaSergiy\TrypilliaCompiler\Ir\IrGenerator;
 use Exception;
 
 /**
@@ -23,7 +23,7 @@ class Compiler
         string $filename,
         Architecture $architecture = Architecture::X86_64,
     ): void {
-        $program = (new IRGenerator())->generate($ast);
+        $program = (new IrGenerator())->generate($ast);
         $backend = self::resolveBackend($architecture);
 
         $backend->emit($program, $filename);
