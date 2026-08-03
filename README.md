@@ -1,9 +1,6 @@
 # Trypillia Compiler
 
-An ahead-of-time (AOT) compiler for **Trypillia**, a minimal imperative
-language. It compiles `.try` source files directly into native, statically
-linked **x86_64 ELF** executables for Linux — no external assembler, linker,
-or runtime is involved. The compiler itself is a pure PHP application.
+An ahead-of-time (AOT) compiler for **Trypillia**, a minimal imperative language. It compiles `.try` source files directly into native, statically linked **x86_64 ELF** executables for Linux — no external assembler, linker, or runtime is involved. The compiler itself is a pure PHP application.
 
 ## Requirements
 
@@ -72,10 +69,7 @@ The compiler is a straightforward four-stage pipeline:
 | Compiler | `ChernegaSergiy\TrypilliaCompiler\Compiler` | Walks the AST and drives the emitter |
 | CLI | `ChernegaSergiy\TrypilliaCompiler\Cli\CompilerApplication` | Command-line front end |
 
-`X86Emitter` builds the `.text` and `.data` sections byte by byte and hand
-assembles a minimal ELF64 executable header and a single `PT_LOAD` program
-header — there is no relocation table, symbol table, or dynamic linking, so
-the resulting binaries only run on Linux/x86_64.
+`X86Emitter` builds the `.text` and `.data` sections byte by byte and hand assembles a minimal ELF64 executable header and a single `PT_LOAD` program header — there is no relocation table, symbol table, or dynamic linking, so the resulting binaries only run on Linux/x86_64.
 
 ## Testing
 
@@ -83,9 +77,7 @@ the resulting binaries only run on Linux/x86_64.
 composer test
 ```
 
-The suite covers the lexer, parser, and code generator in isolation, plus
-integration tests that compile small Trypillia programs into real binaries
-and assert on their actual runtime output.
+The suite covers the lexer, parser, and code generator in isolation, plus integration tests that compile small Trypillia programs into real binaries and assert on their actual runtime output.
 
 ## Contributing
 
