@@ -208,7 +208,8 @@ class Arm32Emitter
                 $this->emitPrintString((string) $operands[0]);
                 break;
             case 'print_num':
-                throw new Exception('ARM32 print_num is not implemented yet.');
+                $this->emitPrintNumber($this->register((string) $operands[0]));
+                break;
             default:
                 throw new Exception("Unsupported ARM32 operation: {$opcode}");
         }
@@ -256,6 +257,60 @@ class Arm32Emitter
         $this->emitWord32(0xE3500000 | ($register << 16));
     }
 
+    private function emitCmpImmRaw(int $register, int $immediate): void
+    {
+        if ($immediate < 0 || $immediate > 255) {
+            throw new Exception("ARM32 cmp immediate out of range: {$immediate}");
+        }
+        $this->emitWord32(0xE3500000 | ($register << 16) | $immediate);
+    }
+
+    private function emitAddImmRaw(int $destination, int $left, int $immediate): void
+    {
+        if ($immediate < 0 || $immediate > 255) {
+            throw new Exception("ARM32 add immediate out of range: {$immediate}");
+        }
+        $this->emitWord32(0xE2800000 | ($left << 16) | ($destination << 12) | $immediate);
+    }
+
+    private function emitSubImmRaw(int $destination, int $left, int $immediate): void
+    {
+        if ($immediate < 0 || $immediate > 255) {
+            throw new Exception("ARM32 sub immediate out of range: {$immediate}");
+        }
+        $this->emitWord32(0xE2400000 | ($left << 16) | ($destination << 12) | $immediate);
+    }
+
+    private function emitSubRegRaw(int $destination, int $left, int $right): void
+    {
+        $this->emitWord32(0xE0400000 | ($left << 16) | ($destination << 12) | $right);
+    }
+
+    private function emitMovRegRaw(int $destination, int $source): void
+    {
+        $this->emitWord32(0xE1A00000 | ($destination << 12) | $source);
+    }
+
+    private function emitRsbImm0(int $destination, int $source): void
+    {
+        $this->emitWord32(0xE2600000 | ($source << 16) | ($destination << 12));
+    }
+
+    private function emitUdivRaw(int $destination, int $dividend, int $divisor): void
+    {
+        $this->emitWord32(0xE730F010 | ($destination << 16) | ($divisor << 8) | $dividend);
+    }
+
+    private function emitMls(int $destination, int $left, int $right, int $addend): void
+    {
+        $this->emitWord32(0xE0600090 | ($destination << 16) | ($addend << 12) | ($right << 8) | $left);
+    }
+
+    private function emitStrbRaw(int $source, int $addressRegister): void
+    {
+        $this->emitWord32(0xE5C00000 | ($addressRegister << 16) | ($source << 12));
+    }
+
     private function emitMovCondition(int $destination, string $condition): void
     {
         $trueLabel = $this->nextInternalLabel('set_true');
@@ -267,6 +322,70 @@ class Arm32Emitter
         $this->defineLabel($trueLabel);
         $this->emitMovImm32($destination, 1);
         $this->defineLabel($endLabel);
+    }
+
+    /**
+     * Converts the integer held in the given register to a decimal ASCII
+     * string on the stack and writes it (with a trailing newline) via the
+     * write(2) syscall. Uses r3-r9 as scratch registers.
+     *
+     * Requires hardware integer division (UDIV), available on ARMv7-A cores
+     * with the integer-divide extension (e.g. Cortex-A7/A15) and under QEMU
+     * user-mode emulation's default CPU model.
+     */
+    private function emitPrintNumber(int $valueRegister): void
+    {
+        $bufferSize = 32;
+        $doneDigits = $this->nextInternalLabel('num_done_digits');
+        $isPositive = $this->nextInternalLabel('num_is_positive');
+        $skipSign = $this->nextInternalLabel('num_skip_sign');
+        $loop = $this->nextInternalLabel('num_loop');
+
+        $this->emitSubImmRaw(13, 13, $bufferSize); // sub sp, sp, #bufferSize
+
+        // r5 = pointer to the last buffer byte; write the trailing newline there.
+        $this->emitAddImmRaw(5, 13, $bufferSize - 1); // add r5, sp, #(bufferSize - 1)
+        $this->emitMovImm32(6, 10); // mov r6, #'\n'
+        $this->emitStrbRaw(6, 5);
+        $this->emitSubImmRaw(5, 5, 1); // sub r5, r5, #1
+
+        $this->emitMovRegRaw(4, $valueRegister); // mov r4, <value>
+        $this->emitMovImm32(9, 10); // mov r9, #10 (divisor)
+        $this->emitMovImm32(8, 0); // mov r8, #0 (negative flag)
+
+        $this->emitCmpImmRaw(4, 0);
+        $this->emitBranchPlaceholder($isPositive, $this->conditionCode('ge'));
+        $this->emitRsbImm0(4, 4); // rsb r4, r4, #0 (negate)
+        $this->emitMovImm32(8, 1); // mov r8, #1
+        $this->defineLabel($isPositive);
+
+        $this->defineLabel($loop);
+        $this->emitUdivRaw(6, 4, 9); // udiv r6, r4, r9 (quotient)
+        $this->emitMls(3, 6, 9, 4); // mls r3, r6, r9, r4 (remainder = r4 - r6*r9)
+        $this->emitAddImmRaw(3, 3, 48); // add r3, r3, #'0'
+        $this->emitStrbRaw(3, 5);
+        $this->emitSubImmRaw(5, 5, 1); // sub r5, r5, #1
+        $this->emitMovRegRaw(4, 6); // mov r4, r6
+        $this->emitCmpImmRaw(4, 0);
+        $this->emitBranchPlaceholder($loop, $this->conditionCode('ne'));
+
+        $this->defineLabel($doneDigits);
+        $this->emitCmpImmRaw(8, 0);
+        $this->emitBranchPlaceholder($skipSign, $this->conditionCode('eq'));
+        $this->emitMovImm32(3, 45); // mov r3, #'-'
+        $this->emitStrbRaw(3, 5);
+        $this->emitSubImmRaw(5, 5, 1); // sub r5, r5, #1
+        $this->defineLabel($skipSign);
+
+        $this->emitAddImmRaw(1, 5, 1); // r1 = start of the string (r5 + 1)
+        $this->emitAddImmRaw(3, 13, $bufferSize); // r3 = sp + bufferSize (one past the end)
+        $this->emitSubRegRaw(2, 3, 1); // r2 = length = r3 - r1
+
+        $this->emitMovImm32(0, 1); // stdout fd
+        $this->emitMovImm32(7, 4); // sys_write
+        $this->emitWord32(0xEF000000); // svc 0
+
+        $this->emitAddImmRaw(13, 13, $bufferSize); // add sp, sp, #bufferSize
     }
 
     private function emitPrintString(string $value): void
@@ -286,9 +405,9 @@ class Arm32Emitter
 
     private function emitMovImm32(int $register, int $value): void
     {
-        if ($value < 0) {
-            throw new Exception('Negative immediates are not supported in ARM32 emitter.');
-        }
+        // ARM32 (and PHP) integers here are read via their native two's
+        // complement bit pattern, so negative values encode the same way
+        // as positive ones once masked down to 16-bit halves.
         $low = $value & 0xFFFF;
         $high = ($value >> 16) & 0xFFFF;
 
@@ -375,6 +494,7 @@ class Arm32Emitter
         return match ($condition) {
             'eq' => 0x0,
             'ne' => 0x1,
+            'ge' => 0xA,
             'lt' => 0xB,
             default => throw new Exception("Unsupported ARM32 condition: {$condition}"),
         };
