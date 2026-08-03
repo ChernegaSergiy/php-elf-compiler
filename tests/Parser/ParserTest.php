@@ -8,6 +8,7 @@ use ChernegaSergiy\TrypilliaCompiler\Ast\AssignStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BinOpNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\IfStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\LetStmt;
+use ChernegaSergiy\TrypilliaCompiler\Ast\NotNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NumberNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\PrintStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\StringNode;
@@ -107,5 +108,14 @@ class ParserTest extends TestCase
         $this->assertNotNull($stmt->elseBody);
         $this->assertCount(1, $stmt->thenBody);
         $this->assertCount(1, $stmt->elseBody);
+    }
+
+    public function testParsesNotExpression(): void
+    {
+        [$stmt] = $this->parse('let x = !a;');
+
+        $this->assertInstanceOf(LetStmt::class, $stmt);
+        $this->assertInstanceOf(NotNode::class, $stmt->expr);
+        $this->assertInstanceOf(VarNode::class, $stmt->expr->expr);
     }
 }
