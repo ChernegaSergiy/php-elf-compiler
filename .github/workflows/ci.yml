@@ -8,12 +8,13 @@ on:
 
 jobs:
   test:
-    name: PHP ${{ matrix.php-version }}
-    runs-on: ubuntu-latest
+    name: PHP ${{ matrix.php-version }} (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         php-version: ['8.1', '8.2', '8.3']
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
 
     steps:
       - name: Checkout
@@ -33,9 +34,9 @@ jobs:
         uses: actions/cache@v6
         with:
           path: vendor
-          key: composer-${{ runner.os }}-${{ matrix.php-version }}-${{ hashFiles('composer.lock') }}
+          key: composer-${{ runner.os }}-${{ runner.arch }}-${{ matrix.php-version }}-${{ hashFiles('composer.lock') }}
           restore-keys: |
-            composer-${{ runner.os }}-${{ matrix.php-version }}-
+            composer-${{ runner.os }}-${{ runner.arch }}-${{ matrix.php-version }}-
 
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress
