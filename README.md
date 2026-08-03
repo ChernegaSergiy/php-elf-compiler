@@ -80,6 +80,8 @@ Current backend support:
 - 🚧 ARM32
 - 🚧 ARM64
 
+`Arm32BackendEmitter` and `Arm64BackendEmitter` now translate IR opcodes into architecture-specific codegen operations, and their low-level emitters are scaffolded for future ELF emission.
+
 `X86Emitter` builds the `.text` and `.data` sections byte by byte and hand assembles a minimal ELF64 executable header and a single `PT_LOAD` program header — there is no relocation table, symbol table, or dynamic linking, so the resulting binaries currently run only on Linux/x86_64.
 
 ## Testing
