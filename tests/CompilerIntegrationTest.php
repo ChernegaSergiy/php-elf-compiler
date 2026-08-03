@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ChernegaSergiy\TrypilliaCompiler\Tests;
 
+use ChernegaSergiy\TrypilliaCompiler\Backend\Architecture;
 use ChernegaSergiy\TrypilliaCompiler\Compiler;
 use ChernegaSergiy\TrypilliaCompiler\Lexer\Lexer;
 use ChernegaSergiy\TrypilliaCompiler\Parser\Parser;
@@ -17,10 +18,13 @@ class CompilerIntegrationTest extends TestCase
 {
     private string $binaryPath;
 
+    private ?Architecture $architecture;
+
     protected function setUp(): void
     {
-        if (php_uname('m') !== 'x86_64') {
-            $this->markTestSkipped('Compiler integration tests currently execute x86_64 binaries only.');
+        $this->architecture = $this->resolveArchitecture();
+        if ($this->architecture === null) {
+            $this->markTestSkipped('Unsupported architecture: ' . php_uname('m'));
         }
 
         $this->binaryPath = tempnam(sys_get_temp_dir(), 'trypillia_bin_');
@@ -33,11 +37,21 @@ class CompilerIntegrationTest extends TestCase
         }
     }
 
+    private function resolveArchitecture(): ?Architecture
+    {
+        return match (php_uname('m')) {
+            'x86_64' => Architecture::X86_64,
+            'aarch64', 'arm64' => Architecture::ARM64,
+            'armv7l', 'armv8l', 'arm' => Architecture::ARM32,
+            default => null,
+        };
+    }
+
     private function compile(string $source): void
     {
         $tokens = Lexer::run($source);
         $ast = (new Parser($tokens))->parse();
-        Compiler::compile($ast, $this->binaryPath);
+        Compiler::compile($ast, $this->binaryPath, $this->architecture);
     }
 
     public function testCompilesAndRunsAStringPrintProgram(): void
