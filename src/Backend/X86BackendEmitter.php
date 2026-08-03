@@ -67,16 +67,24 @@ class X86BackendEmitter implements BackendEmitter
                 $this->emitter->storeLocal($name);
                 break;
             case 'add_int':
-                $this->emitBinaryMath($instruction, static fn (X86Emitter $emitter): void => $emitter->addRaxRdx());
+                $this->emitBinaryMath($instruction, static function (X86Emitter $emitter): void {
+                    $emitter->addRaxRdx();
+                });
                 break;
             case 'cmp_lt':
-                $this->emitBinaryCompare($instruction, static fn (X86Emitter $emitter): void => $emitter->emitSetlRax());
+                $this->emitBinaryCompare($instruction, static function (X86Emitter $emitter): void {
+                    $emitter->emitSetlRax();
+                });
                 break;
             case 'cmp_eq':
-                $this->emitBinaryCompare($instruction, static fn (X86Emitter $emitter): void => $emitter->emitSeteRax());
+                $this->emitBinaryCompare($instruction, static function (X86Emitter $emitter): void {
+                    $emitter->emitSeteRax();
+                });
                 break;
             case 'cmp_ne':
-                $this->emitBinaryCompare($instruction, static fn (X86Emitter $emitter): void => $emitter->emitSetneRax());
+                $this->emitBinaryCompare($instruction, static function (X86Emitter $emitter): void {
+                    $emitter->emitSetneRax();
+                });
                 break;
             case 'not_bool':
                 $result = $this->requireResult($instruction);
