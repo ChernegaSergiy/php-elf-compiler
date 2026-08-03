@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace ChernegaSergiy\TrypilliaCompiler\Tests\Ir;
+namespace ChernegaSergiy\TrypilliaCompiler\Tests\Midend;
 
-use ChernegaSergiy\TrypilliaCompiler\Ir\IrGenerator;
+use ChernegaSergiy\TrypilliaCompiler\Midend\IrGenerator;
 use ChernegaSergiy\TrypilliaCompiler\Lexer\Lexer;
 use ChernegaSergiy\TrypilliaCompiler\Parser\Parser;
 use PHPUnit\Framework\TestCase;

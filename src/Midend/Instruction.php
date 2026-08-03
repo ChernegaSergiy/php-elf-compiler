@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ChernegaSergiy\TrypilliaCompiler\Ir;
+namespace ChernegaSergiy\TrypilliaCompiler\Midend;
 
 /**
  * A single three-address style IR instruction.

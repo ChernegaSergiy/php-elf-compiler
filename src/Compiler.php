@@ -7,7 +7,7 @@ namespace ChernegaSergiy\TrypilliaCompiler;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;
 use ChernegaSergiy\TrypilliaCompiler\Backend\Architecture;
 use ChernegaSergiy\TrypilliaCompiler\Backend\X86BackendEmitter;
-use ChernegaSergiy\TrypilliaCompiler\Ir\IrGenerator;
+use ChernegaSergiy\TrypilliaCompiler\Midend\IrGenerator;
 use Exception;
 
 /**

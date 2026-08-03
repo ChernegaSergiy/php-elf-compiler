@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace ChernegaSergiy\TrypilliaCompiler\Backend;
 
 use ChernegaSergiy\TrypilliaCompiler\CodeGen\X86Emitter;
-use ChernegaSergiy\TrypilliaCompiler\Ir\Instruction;
-use ChernegaSergiy\TrypilliaCompiler\Ir\Program;
+use ChernegaSergiy\TrypilliaCompiler\Midend\Instruction;
+use ChernegaSergiy\TrypilliaCompiler\Midend\Program;
 use Exception;
 
 /**
