@@ -85,6 +85,8 @@ class Lexer
                     'let' => TokenType::LET,
                     'print' => TokenType::PRINT,
                     'while' => TokenType::WHILE,
+                    'if' => TokenType::IF,
+                    'else' => TokenType::ELSE,
                     default => TokenType::IDENTIFIER,
                 };
                 $this->tokens[] = new Token($type, $val);
