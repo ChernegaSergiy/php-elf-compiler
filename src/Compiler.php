@@ -9,6 +9,7 @@ use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BinOpNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\IfStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\LetStmt;
+use ChernegaSergiy\TrypilliaCompiler\Ast\NotNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NumberNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\PrintStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\StringNode;
@@ -105,6 +106,10 @@ class Compiler
                 $emitter->emitCmpRaxRdx();
                 $emitter->emitSetneRax();
             }
+        } elseif ($node instanceof NotNode) {
+            self::compileExpr($node->expr, $emitter);
+            $emitter->emitCmpRaxImm0();
+            $emitter->emitSeteRax();
         }
     }
 }
