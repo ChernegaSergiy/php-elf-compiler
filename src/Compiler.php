@@ -4,112 +4,37 @@ declare(strict_types=1);
 
 namespace ChernegaSergiy\TrypilliaCompiler;
 
-use ChernegaSergiy\TrypilliaCompiler\Ast\AssignStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;
-use ChernegaSergiy\TrypilliaCompiler\Ast\BinOpNode;
-use ChernegaSergiy\TrypilliaCompiler\Ast\IfStmt;
-use ChernegaSergiy\TrypilliaCompiler\Ast\LetStmt;
-use ChernegaSergiy\TrypilliaCompiler\Ast\NotNode;
-use ChernegaSergiy\TrypilliaCompiler\Ast\NumberNode;
-use ChernegaSergiy\TrypilliaCompiler\Ast\PrintStmt;
-use ChernegaSergiy\TrypilliaCompiler\Ast\StringNode;
-use ChernegaSergiy\TrypilliaCompiler\Ast\VarNode;
-use ChernegaSergiy\TrypilliaCompiler\Ast\WhileStmt;
-use ChernegaSergiy\TrypilliaCompiler\CodeGen\X86Emitter;
+use ChernegaSergiy\TrypilliaCompiler\Backend\Architecture;
+use ChernegaSergiy\TrypilliaCompiler\Backend\X86BackendEmitter;
+use ChernegaSergiy\TrypilliaCompiler\IR\IRGenerator;
+use Exception;
 
 /**
- * Walks a Trypillia AST and compiles it into a native x86_64 ELF binary.
+ * Compiles a Trypillia AST into an architecture-agnostic IR and passes it to a backend.
  */
 class Compiler
 {
     /**
      * @param AstNode[] $ast
      */
-    public static function compile(array $ast, string $filename): void
-    {
-        $emitter = new X86Emitter();
-        foreach ($ast as $stmt) {
-            self::compileStmt($stmt, $emitter);
-        }
-        $emitter->generateBinary($filename);
+    public static function compile(
+        array $ast,
+        string $filename,
+        Architecture $architecture = Architecture::X86_64,
+    ): void {
+        $program = (new IRGenerator())->generate($ast);
+        $backend = self::resolveBackend($architecture);
+
+        $backend->emit($program, $filename);
     }
 
-    private static function compileStmt(AstNode $node, X86Emitter $emitter): void
+    private static function resolveBackend(Architecture $architecture): X86BackendEmitter
     {
-        if ($node instanceof LetStmt || $node instanceof AssignStmt) {
-            self::compileExpr($node->expr, $emitter);
-            $emitter->storeLocal($node->name);
-        } elseif ($node instanceof PrintStmt) {
-            if ($node->expr instanceof StringNode) {
-                $emitter->emitPrintString($node->expr->val);
-            } else {
-                self::compileExpr($node->expr, $emitter);
-                $emitter->emitPrintNumberInRax();
-            }
-        } elseif ($node instanceof WhileStmt) {
-            $loopStart = $emitter->getCurrentOffset();
-            self::compileExpr($node->condition, $emitter);
-            $emitter->emitCmpRaxImm0();
-            $patchOffset = $emitter->emitJe_ForwardPlaceholder();
-
-            foreach ($node->body as $stmt) {
-                self::compileStmt($stmt, $emitter);
-            }
-
-            $emitter->emitJmp_Backward($loopStart);
-            $emitter->patchForwardJump($patchOffset);
-        } elseif ($node instanceof IfStmt) {
-            self::compileExpr($node->condition, $emitter);
-            $emitter->emitCmpRaxImm0();
-            $elseJumpOffset = $emitter->emitJe_ForwardPlaceholder();
-
-            foreach ($node->thenBody as $stmt) {
-                self::compileStmt($stmt, $emitter);
-            }
-
-            if ($node->elseBody !== null) {
-                $pastElseJumpOffset = $emitter->emitJmp_ForwardPlaceholder();
-
-                $emitter->patchForwardJump($elseJumpOffset);
-
-                foreach ($node->elseBody as $stmt) {
-                    self::compileStmt($stmt, $emitter);
-                }
-
-                $emitter->patchForwardJump($pastElseJumpOffset);
-            } else {
-                $emitter->patchForwardJump($elseJumpOffset);
-            }
+        if ($architecture === Architecture::X86_64) {
+            return new X86BackendEmitter();
         }
-    }
 
-    private static function compileExpr(AstNode $node, X86Emitter $emitter): void
-    {
-        if ($node instanceof NumberNode) {
-            $emitter->movRaxImm($node->val);
-        } elseif ($node instanceof VarNode) {
-            $emitter->loadLocal($node->name);
-        } elseif ($node instanceof BinOpNode) {
-            self::compileExpr($node->right, $emitter);
-            $emitter->pushRax();
-            self::compileExpr($node->left, $emitter);
-            $emitter->popRdx();
-            if ($node->op === '+') {
-                $emitter->addRaxRdx();
-            } elseif ($node->op === '<') {
-                $emitter->emitCmpRaxRdx();
-                $emitter->emitSetlRax();
-            } elseif ($node->op === '==') {
-                $emitter->emitCmpRaxRdx();
-                $emitter->emitSeteRax();
-            } elseif ($node->op === '!=') {
-                $emitter->emitCmpRaxRdx();
-                $emitter->emitSetneRax();
-            }
-        } elseif ($node instanceof NotNode) {
-            self::compileExpr($node->expr, $emitter);
-            $emitter->emitCmpRaxImm0();
-            $emitter->emitSeteRax();
-        }
+        throw new Exception("Unsupported architecture backend: {$architecture->value}");
     }
 }
