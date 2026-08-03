@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ChernegaSergiy\TrypilliaCompiler\Cli;
 
+use ChernegaSergiy\TrypilliaCompiler\Backend\Architecture;
 use ChernegaSergiy\TrypilliaCompiler\Compiler;
 use ChernegaSergiy\TrypilliaCompiler\Lexer\Lexer;
 use ChernegaSergiy\TrypilliaCompiler\Parser\Parser;
@@ -28,7 +29,7 @@ class CompilerApplication
         $args = array_slice($argv, 1);
         if (empty($args) || in_array('--help', $args, true) || in_array('-h', $args, true)) {
             echo "Trypillia AOT Compiler v0.3\n";
-            echo "Usage: trypillia <file.try> [-o <app>]\n";
+            echo "Usage: trypillia <file.try> [-o <app>] [-arch <x86|x86_64|arm32|arm64>]\n";
 
             return 0;
         }
@@ -47,6 +48,23 @@ class CompilerApplication
             $outputFile = pathinfo($inputFile, PATHINFO_FILENAME) ?: 'app';
         }
 
+        $archIndex = array_search('-arch', $args, true);
+        if ($archIndex === false) {
+            $archIndex = array_search('-a', $args, true);
+        }
+
+        if ($archIndex !== false && isset($args[$archIndex + 1])) {
+            $architecture = Architecture::tryFrom($args[$archIndex + 1]);
+            if ($architecture === null) {
+                echo "trypillia: unknown architecture '{$args[$archIndex + 1]}'\n";
+                echo "trypillia: supported: x86, x86_64, arm32, arm64\n";
+
+                return 1;
+            }
+        } else {
+            $architecture = $this->detectHostArchitecture();
+        }
+
         $source = file_get_contents($inputFile);
         echo "Compiling $inputFile -> ./$outputFile\n";
         $startTime = microtime(true);
@@ -55,10 +73,10 @@ class CompilerApplication
             $tokens = Lexer::run($source);
             $parser = new Parser($tokens);
             $ast = $parser->parse();
-            Compiler::compile($ast, $outputFile);
+            Compiler::compile($ast, $outputFile, $architecture);
 
             $timeTaken = round((microtime(true) - $startTime) * 1000, 2);
-            echo "Built in {$timeTaken} ms\n";
+            echo "Built in {$timeTaken} ms ({$architecture->value})\n";
 
             return 0;
         } catch (Exception $e) {
@@ -66,5 +84,23 @@ class CompilerApplication
 
             return 1;
         }
+    }
+
+    /**
+     * Maps the output of php_uname('m') to a compiler Architecture, so that
+     * running the compiler without -arch produces a binary native to the
+     * current host instead of always defaulting to x86_64.
+     */
+    private function detectHostArchitecture(): Architecture
+    {
+        $machine = strtolower(php_uname('m'));
+
+        return match (true) {
+            in_array($machine, ['x86_64', 'amd64'], true) => Architecture::X86_64,
+            in_array($machine, ['i386', 'i486', 'i586', 'i686', 'x86'], true) => Architecture::X86,
+            in_array($machine, ['aarch64', 'arm64'], true) => Architecture::ARM64,
+            str_starts_with($machine, 'armv7') || str_starts_with($machine, 'arm') => Architecture::ARM32,
+            default => Architecture::X86_64,
+        };
     }
 }
