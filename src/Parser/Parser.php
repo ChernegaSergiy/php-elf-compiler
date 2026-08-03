@@ -9,6 +9,7 @@ use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BinOpNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\IfStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\LetStmt;
+use ChernegaSergiy\TrypilliaCompiler\Ast\NotNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NumberNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\PrintStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\StringNode;
@@ -130,7 +131,16 @@ class Parser
 
     private function parseExpr(): AstNode
     {
-        $tok = $this->consume();
+        $tok = $this->peek();
+
+        if ($tok->type === TokenType::NOT) {
+            $this->consume();
+            $expr = $this->parseExpr();
+
+            return new NotNode($expr);
+        }
+
+        $this->consume();
         $node = match ($tok->type) {
             TokenType::NUMBER => new NumberNode((int) $tok->value),
             TokenType::STRING => new StringNode($tok->value),
