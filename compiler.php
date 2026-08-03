@@ -277,14 +277,19 @@ class X86Emitter {
     }
 
     public function generateBinary(string $filename): void {
-        // ВАЖЛИВО: Очищаємо статус завершення (mov rdi, 0)
+        // Очищаємо статус завершення (mov rdi, 0)
         $this->textSection .= "\x48\xC7\xC7\x00\x00\x00\x00";
         $this->textSection .= "\x48\xC7\xC0\x3C\x00\x00\x00\x0F\x05"; // sys_exit
         
         $entry_point = 0x400078;
-        $prologue = "\x55\x48\x89\xE5"; 
         
-        $dataVirtualAddress = 0x400000 + 120 + 4 + strlen($this->textSection);
+        // ВАЖЛИВО: Резервуємо 256 байтів на стеку для локальних змінних!
+        // push rbp; mov rbp, rsp; sub rsp, 256
+        $prologue = "\x55\x48\x89\xE5\x48\x81\xEC\x00\x01\x00\x00"; 
+        $prologueLen = strlen($prologue); // Довжина прологу тепер більша
+        
+        // Перераховуємо адреси з урахуванням нового прологу
+        $dataVirtualAddress = 0x400000 + 120 + $prologueLen + strlen($this->textSection);
         
         foreach ($this->relocations as $reloc) {
             $absoluteAddress = $dataVirtualAddress + $reloc['dataOffset'];
@@ -292,7 +297,7 @@ class X86Emitter {
         }
 
         $codeSize = strlen($this->textSection);
-        $fileSize = 120 + 4 + $codeSize + strlen($this->dataSection);
+        $fileSize = 120 + $prologueLen + $codeSize + strlen($this->dataSection);
 
         $elfHeader = pack("C16vvVPPPVvvvvvv", 0x7F, 0x45, 0x4C, 0x46, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0x3E, 1, $entry_point, 64, 0, 0, 64, 56, 1, 0, 0, 0);
         $programHeader = pack("VVPPPPPP", 1, 5, 0, 0x400000, 0x400000, $fileSize, $fileSize, 0x1000);
