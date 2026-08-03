@@ -75,7 +75,7 @@ class Lexer {
 }
 
 // ==========================================
-// 2. AST ТА ПАРСЕР (З блоками та циклами)
+// 2. AST ТА ПАРСЕР
 // ==========================================
 interface AstNode {}
 class NumberNode implements AstNode { public function __construct(public int $val) {} }
@@ -136,7 +136,6 @@ class Parser {
             return new WhileStmt($condition, $body);
             
         } elseif ($tok->type === TokenType::IDENTIFIER) {
-            // Переприсвоєння змінної
             $name = $this->consume()->value;
             $this->expect(TokenType::ASSIGN);
             $expr = $this->parseExpr();
@@ -167,7 +166,7 @@ class Parser {
 }
 
 // ==========================================
-// 3. X86_64 EMMITER (Контроль потоку)
+// 3. X86_64 EMMITER (Асемблер)
 // ==========================================
 class X86Emitter {
     private string $textSection = "";
@@ -187,75 +186,101 @@ class X86Emitter {
             $this->symbols[$name] = -$this->stackOffset;
         }
         $offset = $this->symbols[$name];
-        $this->textSection .= "\x48\x89\x45" . chr(256 + $offset); // mov [rbp + offset], rax
+        $this->textSection .= "\x48\x89\x45" . chr(256 + $offset);
     }
 
     public function loadLocal(string $name): void {
         $offset = $this->symbols[$name] ?? throw new Exception("Невідома змінна: $name");
-        $this->textSection .= "\x48\x8B\x45" . chr(256 + $offset); // mov rax, [rbp + offset]
+        $this->textSection .= "\x48\x8B\x45" . chr(256 + $offset);
     }
 
-    // --- ЛОГІКА ЦИКЛІВ ТА ПОРІВНЯНЬ ---
-    
     public function emitCmpRaxRdx(): void {
-        $this->textSection .= "\x48\x39\xD0"; // cmp rax, rdx
+        $this->textSection .= "\x48\x39\xD0";
     }
     
     public function emitSetlRax(): void {
-        // Встановлюємо 1 в RAX, якщо RAX < RDX, інакше 0
-        $this->textSection .= "\x0F\x9C\xC0"; // setl al
-        $this->textSection .= "\x48\x0F\xB6\xC0"; // movzx rax, al
+        $this->textSection .= "\x0F\x9C\xC0\x48\x0F\xB6\xC0";
     }
     
     public function emitCmpRaxImm0(): void {
-        $this->textSection .= "\x48\x83\xF8\x00"; // cmp rax, 0
+        $this->textSection .= "\x48\x83\xF8\x00";
     }
 
     public function getCurrentOffset(): int {
         return strlen($this->textSection);
     }
 
-    // Jump if Equal (Стрибок, якщо умова стала 0/False)
     public function emitJe_ForwardPlaceholder(): int {
-        $this->textSection .= "\x0F\x84"; // je rel32
+        $this->textSection .= "\x0F\x84";
         $offset = strlen($this->textSection);
-        $this->textSection .= "\x00\x00\x00\x00"; // пустушка на 4 байти
+        $this->textSection .= "\x00\x00\x00\x00";
         return $offset;
     }
 
-    // Безумовний стрибок назад на початок циклу
     public function emitJmp_Backward(int $target): void {
         $current = strlen($this->textSection);
         $rel = $target - ($current + 5);
-        $this->textSection .= "\xE9" . pack('V', $rel); // jmp rel32
+        $this->textSection .= "\xE9" . pack('V', $rel);
     }
 
-    // Заповнюємо пустушку актуальною адресою зміщення
     public function patchForwardJump(int $offset): void {
         $current = strlen($this->textSection);
         $rel = $current - ($offset + 4);
         $this->textSection = substr_replace($this->textSection, pack('V', $rel), $offset, 4);
     }
-    // ---------------------------------
+
+    // ВАЖЛИВО: Алгоритм itoa (з числа в рядок)
+    public function emitPrintNumberInRax(): void {
+        $this->textSection .= 
+            "\x49\x89\xE2" .                 // mov r10, rsp (зберігаємо стек)
+            "\x48\x83\xEC\x20" .             // sub rsp, 32 (буфер на стеку)
+            "\x49\x89\xE3" .                 // mov r11, rsp
+            "\x49\x83\xC3\x1F" .             // add r11, 31 (кінець буфера)
+            "\x41\xC6\x03\x0A" .             // mov byte [r11], 10 (символ нового рядка '\n')
+            "\x4D\x89\xD8" .                 // mov r8, r11
+            "\x48\xC7\xC1\x0A\x00\x00\x00" . // mov rcx, 10 (дільник)
+            
+            // loop_start:
+            "\x49\xFF\xC8" .                 // dec r8
+            "\x48\x31\xD2" .                 // xor rdx, rdx
+            "\x48\xF7\xF1" .                 // div rcx
+            "\x80\xC2\x30" .                 // add dl, 48 (конвертація в ASCII)
+            "\x41\x88\x10" .                 // mov [r8], dl
+            "\x48\x85\xC0" .                 // test rax, rax
+            "\x75\xEC" .                     // jnz loop_start (-20 байт)
+            
+            // print_sys_write:
+            "\x4C\x89\xDA" .                 // mov rdx, r11
+            "\x4C\x29\xC2" .                 // sub rdx, r8
+            "\x48\x83\xC2\x01" .             // add rdx, 1 (довжина рядка)
+            "\x48\xC7\xC0\x01\x00\x00\x00" . // mov rax, 1 (sys_write)
+            "\x48\xC7\xC7\x01\x00\x00\x00" . // mov rdi, 1 (stdout)
+            "\x4C\x89\xC6" .                 // mov rsi, r8 (вказівник на початок)
+            "\x0F\x05" .                     // syscall
+            "\x4C\x89\xD4";                  // mov rsp, r10 (відновлюємо стек)
+    }
 
     public function emitPrintString(string $str): void {
         $dataLabelOffset = strlen($this->dataSection);
         $this->dataSection .= $str . "\n";
         $strLen = strlen($str) + 1;
 
-        $this->textSection .= "\x48\xC7\xC0\x01\x00\x00\x00"; // rax=1
-        $this->textSection .= "\x48\xC7\xC7\x01\x00\x00\x00"; // rdi=1
+        $this->textSection .= "\x48\xC7\xC0\x01\x00\x00\x00"; 
+        $this->textSection .= "\x48\xC7\xC7\x01\x00\x00\x00"; 
         
-        $this->textSection .= "\x48\xC7\xC6"; // mov rsi, пустушка
+        $this->textSection .= "\x48\xC7\xC6"; 
         $this->relocations[] = ['codeOffset' => strlen($this->textSection), 'dataOffset' => $dataLabelOffset];
         $this->textSection .= pack('V', 0); 
         
-        $this->textSection .= "\x48\xC7\xC2" . pack('V', $strLen); // rdx=довжина
-        $this->textSection .= "\x0F\x05"; // syscall
+        $this->textSection .= "\x48\xC7\xC2" . pack('V', $strLen); 
+        $this->textSection .= "\x0F\x05"; 
     }
 
     public function generateBinary(string $filename): void {
+        // ВАЖЛИВО: Очищаємо статус завершення (mov rdi, 0)
+        $this->textSection .= "\x48\xC7\xC7\x00\x00\x00\x00";
         $this->textSection .= "\x48\xC7\xC0\x3C\x00\x00\x00\x0F\x05"; // sys_exit
+        
         $entry_point = 0x400078;
         $prologue = "\x55\x48\x89\xE5"; 
         
@@ -294,29 +319,22 @@ class Compiler {
         } elseif ($node instanceof PrintStmt) {
             if ($node->expr instanceof StringNode) {
                 $emitter->emitPrintString($node->expr->val);
+            } else {
+                // ВАЖЛИВО: Виводимо числа, які лежать у змінних або виразах!
+                self::compileExpr($node->expr, $emitter);
+                $emitter->emitPrintNumberInRax();
             }
         } elseif ($node instanceof WhileStmt) {
-            // 1. Запам'ятовуємо адресу початку перевірки
             $loopStart = $emitter->getCurrentOffset();
-            
-            // 2. Рахуємо умову (результат 1 або 0 опиниться в RAX)
             self::compileExpr($node->condition, $emitter);
-            
-            // 3. Перевіряємо чи умова = 0 (False)
             $emitter->emitCmpRaxImm0();
-            
-            // 4. Якщо 0 -> стрибаємо В КІНЕЦЬ циклу (залишаємо пустушку)
             $patchOffset = $emitter->emitJe_ForwardPlaceholder();
 
-            // 5. Компілюємо саме тіло циклу
             foreach ($node->body as $stmt) {
                 self::compileStmt($stmt, $emitter);
             }
 
-            // 6. Стрибаємо НАЗАД до перевірки
             $emitter->emitJmp_Backward($loopStart);
-
-            // 7. Патчимо пустушку виходу з циклу актуальним зміщенням
             $emitter->patchForwardJump($patchOffset);
         }
     }
@@ -348,7 +366,7 @@ if (php_sapi_name() !== 'cli') die("Запускати лише з термін�
 
 $args = array_slice($argv, 1);
 if (empty($args) || in_array('--help', $args) || in_array('-h', $args)) {
-    echo "Trypillia AOT Compiler v0.2\n";
+    echo "Trypillia AOT Compiler v0.3\n";
     echo "Використання: php compiler.php <файл.try> [-o <app>]\n";
     exit(0);
 }
