@@ -86,3 +86,7 @@ composer test
 The suite covers the lexer, parser, and code generator in isolation, plus
 integration tests that compile small Trypillia programs into real binaries
 and assert on their actual runtime output.
+
+## License
+
+This project is licensed under the CSSM Unlimited License v2.0 (CSSM-ULv2). See the [LICENSE](LICENSE) file for details.
