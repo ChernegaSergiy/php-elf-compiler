@@ -62,7 +62,7 @@ class Lexer
                     $this->pos++;
                     $this->tokens[] = new Token(TokenType::NOTEQUALS, '!=');
                 } else {
-                    throw new Exception("Невідомий символ: !");
+                    throw new Exception("Unknown character: !");
                 }
             } elseif ($c === '<') {
                 $this->tokens[] = new Token(TokenType::LESS, '<');
@@ -103,7 +103,7 @@ class Lexer
                 };
                 $this->tokens[] = new Token($type, $val);
             } else {
-                throw new Exception("Невідомий символ: $c");
+                throw new Exception("Unknown character: $c");
             }
         }
         $this->tokens[] = new Token(TokenType::EOF, '');
