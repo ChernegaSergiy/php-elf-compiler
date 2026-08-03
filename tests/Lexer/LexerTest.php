@@ -91,4 +91,14 @@ class LexerTest extends TestCase
             array_map(static fn ($token) => $token->type, $tokens),
         );
     }
+
+    public function testTokenizesNotEqualsOperator(): void
+    {
+        $tokens = Lexer::run('a != b');
+
+        $this->assertSame(
+            [TokenType::IDENTIFIER, TokenType::NOTEQUALS, TokenType::IDENTIFIER, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
 }
