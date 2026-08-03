@@ -45,7 +45,12 @@ class Lexer
             }
 
             if ($c === '=') {
-                $this->tokens[] = new Token(TokenType::ASSIGN, '=');
+                if ($this->pos < $this->length && $this->source[$this->pos] === '=') {
+                    $this->pos++;
+                    $this->tokens[] = new Token(TokenType::EQUALS, '==');
+                } else {
+                    $this->tokens[] = new Token(TokenType::ASSIGN, '=');
+                }
             } elseif ($c === '+') {
                 $this->tokens[] = new Token(TokenType::PLUS, '+');
             } elseif ($c === '-') {
