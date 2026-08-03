@@ -138,7 +138,7 @@ class Parser
             default => throw new Exception('Помилка виразу: ' . $tok->value),
         };
 
-        if (in_array($this->peek()->type, [TokenType::PLUS, TokenType::MINUS, TokenType::MULT, TokenType::LESS, TokenType::GREATER, TokenType::EQUALS], true)) {
+        if (in_array($this->peek()->type, [TokenType::PLUS, TokenType::MINUS, TokenType::MULT, TokenType::LESS, TokenType::GREATER, TokenType::EQUALS, TokenType::NOTEQUALS], true)) {
             $opTok = $this->consume();
             $right = $this->parseExpr();
             $node = new BinOpNode($node, $opTok->value, $right);
