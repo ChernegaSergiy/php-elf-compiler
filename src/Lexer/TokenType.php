@@ -24,6 +24,7 @@ enum TokenType
     case LESS;
     case GREATER;
     case EQUALS;
+    case NOTEQUALS;
     case SEMICOLON;
     case LBRACE;
     case RBRACE;
