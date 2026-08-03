@@ -46,7 +46,7 @@ class Parser
     {
         $tok = $this->consume();
         if ($tok->type !== $type) {
-            throw new Exception("Очікувався токен {$type->name}, отримано {$tok->type->name}");
+            throw new Exception("Expected token {$type->name}, got {$tok->type->name}");
         }
 
         return $tok;
@@ -124,7 +124,7 @@ class Parser
 
             return new AssignStmt($name, $expr);
         } else {
-            throw new Exception('Неочікуваний токен: ' . $tok->value);
+            throw new Exception('Unexpected token: ' . $tok->value);
         }
     }
 
@@ -135,7 +135,7 @@ class Parser
             TokenType::NUMBER => new NumberNode((int) $tok->value),
             TokenType::STRING => new StringNode($tok->value),
             TokenType::IDENTIFIER => new VarNode($tok->value),
-            default => throw new Exception('Помилка виразу: ' . $tok->value),
+            default => throw new Exception('Parse error: ' . $tok->value),
         };
 
         if (in_array($this->peek()->type, [TokenType::PLUS, TokenType::MINUS, TokenType::MULT, TokenType::LESS, TokenType::GREATER, TokenType::EQUALS, TokenType::NOTEQUALS], true)) {
