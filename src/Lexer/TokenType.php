@@ -23,6 +23,7 @@ enum TokenType
     case MULT;
     case LESS;
     case GREATER;
+    case EQUALS;
     case SEMICOLON;
     case LBRACE;
     case RBRACE;
