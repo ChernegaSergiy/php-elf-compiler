@@ -7,6 +7,7 @@ namespace ChernegaSergiy\TrypilliaCompiler;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AssignStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BinOpNode;
+use ChernegaSergiy\TrypilliaCompiler\Ast\IfStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\LetStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NumberNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\PrintStmt;
@@ -56,6 +57,28 @@ class Compiler
 
             $emitter->emitJmp_Backward($loopStart);
             $emitter->patchForwardJump($patchOffset);
+        } elseif ($node instanceof IfStmt) {
+            self::compileExpr($node->condition, $emitter);
+            $emitter->emitCmpRaxImm0();
+            $elseJumpOffset = $emitter->emitJe_ForwardPlaceholder();
+
+            foreach ($node->thenBody as $stmt) {
+                self::compileStmt($stmt, $emitter);
+            }
+
+            if ($node->elseBody !== null) {
+                $pastElseJumpOffset = $emitter->emitJmp_ForwardPlaceholder();
+
+                $emitter->patchForwardJump($elseJumpOffset);
+
+                foreach ($node->elseBody as $stmt) {
+                    self::compileStmt($stmt, $emitter);
+                }
+
+                $emitter->patchForwardJump($pastElseJumpOffset);
+            } else {
+                $emitter->patchForwardJump($elseJumpOffset);
+            }
         }
     }
 
