@@ -35,7 +35,7 @@ class CompilerApplication
 
         $inputFile = $args[0];
         if (!file_exists($inputFile)) {
-            echo "❌ File '$inputFile' not found.\n";
+            echo "trypillia: $inputFile: No such file or directory\n";
 
             return 1;
         }
@@ -48,7 +48,7 @@ class CompilerApplication
         }
 
         $source = file_get_contents($inputFile);
-        echo "⚙️  Compiling: $inputFile -> ./$outputFile\n";
+        echo "Compiling $inputFile -> ./$outputFile\n";
         $startTime = microtime(true);
 
         try {
@@ -58,11 +58,11 @@ class CompilerApplication
             Compiler::compile($ast, $outputFile);
 
             $timeTaken = round((microtime(true) - $startTime) * 1000, 2);
-            echo "✅ Built in {$timeTaken} ms.\n🚀 Run: ./$outputFile\n";
+            echo "Built in {$timeTaken} ms\n";
 
             return 0;
         } catch (Exception $e) {
-            echo "\n❌ ERROR: " . $e->getMessage() . "\n";
+            echo "trypillia: error: " . $e->getMessage() . "\n";
 
             return 1;
         }
