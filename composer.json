@@ -2,7 +2,7 @@
     "name": "chernegasergiy/trypillia-compiler",
     "description": "Ahead-of-time compiler for the Trypillia language that emits native x86_64 ELF binaries directly from PHP.",
     "type": "library",
-    "license": "MIT",
+    "license": "LicenseRef-CSSM-Unlimited-2.0",
     "authors": [
         {
             "name": "Serhii Cherneha",
