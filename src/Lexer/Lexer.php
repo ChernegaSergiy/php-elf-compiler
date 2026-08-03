@@ -57,6 +57,13 @@ class Lexer
                 $this->tokens[] = new Token(TokenType::MINUS, '-');
             } elseif ($c === '*') {
                 $this->tokens[] = new Token(TokenType::MULT, '*');
+            } elseif ($c === '!') {
+                if ($this->pos < $this->length && $this->source[$this->pos] === '=') {
+                    $this->pos++;
+                    $this->tokens[] = new Token(TokenType::NOTEQUALS, '!=');
+                } else {
+                    throw new Exception("Невідомий символ: !");
+                }
             } elseif ($c === '<') {
                 $this->tokens[] = new Token(TokenType::LESS, '<');
             } elseif ($c === '>') {
