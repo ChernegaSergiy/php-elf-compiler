@@ -119,6 +119,19 @@ class X86Emitter
     }
 
     /**
+     * Emits a forward unconditional jump (jmp rel32) with a placeholder offset
+     * to be patched later via patchForwardJump().
+     */
+    public function emitJmp_ForwardPlaceholder(): int
+    {
+        $this->textSection .= "\xE9"; // jmp rel32
+        $offset = strlen($this->textSection);
+        $this->textSection .= "\x00\x00\x00\x00";
+
+        return $offset;
+    }
+
+    /**
      * Backpatches the placeholder left by emitJe_ForwardPlaceholder() with the
      * actual relative offset to the current position.
      */
