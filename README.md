@@ -67,7 +67,7 @@ The compiler uses a portable IR pipeline:
 | Lexer | `ChernegaSergiy\TrypilliaCompiler\Lexer` | Source text → token stream |
 | Parser | `ChernegaSergiy\TrypilliaCompiler\Parser` | Token stream → AST |
 | AST | `ChernegaSergiy\TrypilliaCompiler\Ast` | AST node definitions |
-| IR generator | `ChernegaSergiy\TrypilliaCompiler\IR\IRGenerator` | AST → three-address style IR |
+| IR generator | `ChernegaSergiy\TrypilliaCompiler\Ir\IRGenerator` | AST → three-address style IR |
 | Backend | `ChernegaSergiy\TrypilliaCompiler\Backend\*` | IR → machine code for a target architecture |
 | x86_64 emitter | `ChernegaSergiy\TrypilliaCompiler\CodeGen\X86Emitter` | Hand-written x86_64 machine code and ELF assembly |
 | Compiler | `ChernegaSergiy\TrypilliaCompiler\Compiler` | Orchestrates AST → IR → backend pipeline |
