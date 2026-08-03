@@ -77,10 +77,10 @@ Current backend support:
 
 - ✅ x86_64
 - 🚧 x86
-- 🚧 ARM32
-- 🚧 ARM64
+- ✅ ARM32
+- ✅ ARM64
 
-`Arm32BackendEmitter` and `Arm64BackendEmitter` now translate IR opcodes into architecture-specific codegen operations, and their low-level emitters are scaffolded for future ELF emission.
+`Arm32BackendEmitter` and `Arm64BackendEmitter` translate IR opcodes into architecture-specific codegen operations. `Arm32Emitter` and `Arm64Emitter` hand-assemble those operations into minimal static ELF32/ELF64 executables, including a runtime integer-to-string routine (used by `print_num`) that performs sign handling and decimal digit extraction via hardware `udiv`/`msub`/`mls` and writes the result with a `write(2)` syscall. ARM64 binaries can be verified with `qemu-aarch64`; ARM32 binaries require a target (or `qemu-arm`) with the ARMv7 hardware integer-divide extension.
 
 `X86Emitter` builds the `.text` and `.data` sections byte by byte and hand assembles a minimal ELF64 executable header and a single `PT_LOAD` program header — there is no relocation table, symbol table, or dynamic linking, so the resulting binaries currently run only on Linux/x86_64.
 
