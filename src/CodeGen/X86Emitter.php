@@ -56,7 +56,7 @@ class X86Emitter
 
     public function loadLocal(string $name): void
     {
-        $offset = $this->symbols[$name] ?? throw new Exception("Невідома змінна: $name");
+        $offset = $this->symbols[$name] ?? throw new Exception("Unknown variable: $name");
         // mov rax, [rbp + offset]
         $this->textSection .= "\x48\x8B\x45" . chr(256 + $offset);
     }
