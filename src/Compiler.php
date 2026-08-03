@@ -101,6 +101,9 @@ class Compiler
             } elseif ($node->op === '==') {
                 $emitter->emitCmpRaxRdx();
                 $emitter->emitSeteRax();
+            } elseif ($node->op === '!=') {
+                $emitter->emitCmpRaxRdx();
+                $emitter->emitSetneRax();
             }
         }
     }
