@@ -19,6 +19,10 @@ class CompilerIntegrationTest extends TestCase
 
     protected function setUp(): void
     {
+        if (php_uname('m') !== 'x86_64') {
+            $this->markTestSkipped('Compiler integration tests currently execute x86_64 binaries only.');
+        }
+
         $this->binaryPath = tempnam(sys_get_temp_dir(), 'trypillia_bin_');
     }
 
