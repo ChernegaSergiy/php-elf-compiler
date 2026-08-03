@@ -101,4 +101,14 @@ class LexerTest extends TestCase
             array_map(static fn ($token) => $token->type, $tokens),
         );
     }
+
+    public function testTokenizesNotOperator(): void
+    {
+        $tokens = Lexer::run('!a');
+
+        $this->assertSame(
+            [TokenType::NOT, TokenType::IDENTIFIER, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
 }
