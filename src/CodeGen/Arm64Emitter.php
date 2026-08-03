@@ -207,7 +207,8 @@ class Arm64Emitter
                 $this->emitPrintString((string) $operands[0]);
                 break;
             case 'print_num':
-                throw new Exception('ARM64 print_num is not implemented yet.');
+                $this->emitPrintNumber($this->register((string) $operands[0]));
+                break;
             default:
                 throw new Exception("Unsupported ARM64 operation: {$opcode}");
         }
@@ -265,6 +266,66 @@ class Arm64Emitter
         $this->defineLabel($endLabel);
     }
 
+    /**
+     * Converts the integer held in the given register to a decimal ASCII
+     * string on the stack and writes it (with a trailing newline) via the
+     * write(2) syscall. Uses x9-x15 as scratch registers.
+     */
+    private function emitPrintNumber(int $valueRegister): void
+    {
+        $bufferSize = 32;
+        $doneDigits = $this->nextInternalLabel('num_done_digits');
+        $isPositive = $this->nextInternalLabel('num_is_positive');
+        $skipSign = $this->nextInternalLabel('num_skip_sign');
+        $loop = $this->nextInternalLabel('num_loop');
+
+        $this->emitSubImm(31, 31, $bufferSize); // sub sp, sp, #bufferSize
+
+        // x10 = pointer to the last buffer byte; write the trailing newline there.
+        $this->emitAddImmRaw(10, 31, $bufferSize - 1); // add x10, sp, #(bufferSize - 1)
+        $this->emitMovImm64(13, 10); // mov x13, #'\n'
+        $this->emitStrb(13, 10);
+        $this->emitSubImm(10, 10, 1); // sub x10, x10, #1
+
+        $this->emitMovReg(9, $valueRegister); // mov x9, <value>
+        $this->emitMovImm64(11, 10); // mov x11, #10 (divisor)
+        $this->emitMovImm64(12, 0); // mov x12, #0 (negative flag)
+
+        $this->emitCmpImm(9, 0);
+        $this->emitBranchCondPlaceholder('ge', $isPositive);
+        $this->emitNeg(9, 9); // neg x9, x9
+        $this->emitMovImm64(12, 1); // mov x12, #1
+        $this->defineLabel($isPositive);
+
+        $this->defineLabel($loop);
+        $this->emitUdiv(14, 9, 11); // udiv x14, x9, x11
+        $this->emitMsub(13, 14, 11, 9); // msub x13, x14, x11, x9 (remainder)
+        $this->emitAddImmRaw(13, 13, 48); // add x13, x13, #'0'
+        $this->emitStrb(13, 10);
+        $this->emitSubImm(10, 10, 1); // sub x10, x10, #1
+        $this->emitMovReg(9, 14); // mov x9, x14
+        $this->emitCbzPlaceholder('x14', $doneDigits);
+        $this->emitBranchPlaceholder($loop);
+
+        $this->defineLabel($doneDigits);
+        $this->emitCmpImm(12, 0);
+        $this->emitBranchCondPlaceholder('eq', $skipSign);
+        $this->emitMovImm64(13, 45); // mov x13, #'-'
+        $this->emitStrb(13, 10);
+        $this->emitSubImm(10, 10, 1); // sub x10, x10, #1
+        $this->defineLabel($skipSign);
+
+        $this->emitAddImmRaw(1, 10, 1); // x1 = start of the string (x10 + 1)
+        $this->emitAddImmRaw(15, 31, $bufferSize); // x15 = sp + bufferSize (one past the end)
+        $this->emitSubReg(2, 15, 1); // x2 = length = x15 - x1
+
+        $this->emitMovImm64(0, 1); // stdout fd
+        $this->emitMovImm64(8, 64); // sys_write
+        $this->emitWord32(0xD4000001); // svc #0
+
+        $this->emitAddImmRaw(31, 31, $bufferSize); // add sp, sp, #bufferSize
+    }
+
     private function emitPrintString(string $value): void
     {
         $dataOffset = strlen($this->dataSection);
@@ -295,6 +356,52 @@ class Arm64Emitter
             throw new Exception("ARM64 sub immediate out of range: {$immediate}");
         }
         $this->emitWord32(0xD1000000 | ($immediate << 10) | ($left << 5) | $destination);
+    }
+
+    private function emitAddImmRaw(int $destination, int $left, int $immediate): void
+    {
+        if ($immediate < 0 || $immediate > 4095) {
+            throw new Exception("ARM64 add immediate out of range: {$immediate}");
+        }
+        $this->emitWord32(0x91000000 | ($immediate << 10) | ($left << 5) | $destination);
+    }
+
+    private function emitSubReg(int $destination, int $left, int $right): void
+    {
+        $this->emitWord32(0xCB000000 | ($right << 16) | ($left << 5) | $destination);
+    }
+
+    private function emitMovReg(int $destination, int $source): void
+    {
+        $this->emitWord32(0xAA0003E0 | ($source << 16) | $destination);
+    }
+
+    private function emitNeg(int $destination, int $source): void
+    {
+        $this->emitWord32(0xCB0003E0 | ($source << 16) | $destination);
+    }
+
+    private function emitCmpImm(int $register, int $immediate): void
+    {
+        if ($immediate < 0 || $immediate > 4095) {
+            throw new Exception("ARM64 cmp immediate out of range: {$immediate}");
+        }
+        $this->emitWord32(0xF1000000 | ($immediate << 10) | ($register << 5) | 31);
+    }
+
+    private function emitUdiv(int $destination, int $left, int $right): void
+    {
+        $this->emitWord32(0x9AC00800 | ($right << 16) | ($left << 5) | $destination);
+    }
+
+    private function emitMsub(int $destination, int $left, int $right, int $addend): void
+    {
+        $this->emitWord32(0x9B008000 | ($right << 16) | ($addend << 10) | ($left << 5) | $destination);
+    }
+
+    private function emitStrb(int $source, int $addressRegister): void
+    {
+        $this->emitWord32(0x39000000 | ($addressRegister << 5) | $source);
     }
 
     private function emitBranchPlaceholder(string $label): void
@@ -383,16 +490,14 @@ class Arm64Emitter
      */
     private function splitImm64(int $value): array
     {
-        $unsigned = $value;
-        if ($unsigned < 0) {
-            $unsigned = $value & 0xFFFFFFFFFFFFFFFF;
-        }
-
+        // PHP integers are natively 64-bit two's complement, so bitwise
+        // operators already read the correct bit pattern for negative
+        // values without needing an explicit (overflowing) 0xFFFF...F mask.
         return [
-            (int) ($unsigned & 0xFFFF),
-            (int) (($unsigned >> 16) & 0xFFFF),
-            (int) (($unsigned >> 32) & 0xFFFF),
-            (int) (($unsigned >> 48) & 0xFFFF),
+            $value & 0xFFFF,
+            ($value >> 16) & 0xFFFF,
+            ($value >> 32) & 0xFFFF,
+            ($value >> 48) & 0xFFFF,
         ];
     }
 
@@ -410,6 +515,7 @@ class Arm64Emitter
         return match ($condition) {
             'eq' => 0x0,
             'ne' => 0x1,
+            'ge' => 0xA,
             'lt' => 0xB,
             default => throw new Exception("Unsupported ARM64 condition: {$condition}"),
         };
