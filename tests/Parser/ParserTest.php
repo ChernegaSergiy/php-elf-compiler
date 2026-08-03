@@ -6,6 +6,7 @@ namespace ChernegaSergiy\TrypilliaCompiler\Tests\Parser;
 
 use ChernegaSergiy\TrypilliaCompiler\Ast\AssignStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BinOpNode;
+use ChernegaSergiy\TrypilliaCompiler\Ast\IfStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\LetStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NumberNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\PrintStmt;
@@ -85,5 +86,26 @@ class ParserTest extends TestCase
         $this->expectException(\Exception::class);
 
         $this->parse('let a 1;');
+    }
+
+    public function testParsesIfWithoutElse(): void
+    {
+        [$stmt] = $this->parse('if a < b { print a; }');
+
+        $this->assertInstanceOf(IfStmt::class, $stmt);
+        $this->assertInstanceOf(BinOpNode::class, $stmt->condition);
+        $this->assertSame('<', $stmt->condition->op);
+        $this->assertCount(1, $stmt->thenBody);
+        $this->assertNull($stmt->elseBody);
+    }
+
+    public function testParsesIfWithElse(): void
+    {
+        [$stmt] = $this->parse('if a < b { print a; } else { print b; }');
+
+        $this->assertInstanceOf(IfStmt::class, $stmt);
+        $this->assertNotNull($stmt->elseBody);
+        $this->assertCount(1, $stmt->thenBody);
+        $this->assertCount(1, $stmt->elseBody);
     }
 }
