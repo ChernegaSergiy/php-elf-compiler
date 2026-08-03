@@ -7,6 +7,7 @@ namespace ChernegaSergiy\TrypilliaCompiler\Parser;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AssignStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BinOpNode;
+use ChernegaSergiy\TrypilliaCompiler\Ast\IfStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\LetStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NumberNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\PrintStmt;
@@ -93,6 +94,28 @@ class Parser
             $this->consume(); // }
 
             return new WhileStmt($condition, $body);
+        } elseif ($tok->type === TokenType::IF) {
+            $this->consume();
+            $condition = $this->parseExpr();
+            $this->expect(TokenType::LBRACE);
+            $thenBody = [];
+            while ($this->peek()->type !== TokenType::RBRACE) {
+                $thenBody[] = $this->parseStmt();
+            }
+            $this->consume(); // }
+
+            $elseBody = null;
+            if ($this->peek()->type === TokenType::ELSE) {
+                $this->consume();
+                $this->expect(TokenType::LBRACE);
+                $elseBody = [];
+                while ($this->peek()->type !== TokenType::RBRACE) {
+                    $elseBody[] = $this->parseStmt();
+                }
+                $this->consume(); // }
+            }
+
+            return new IfStmt($condition, $thenBody, $elseBody);
         } elseif ($tok->type === TokenType::IDENTIFIER) {
             $name = $this->consume()->value;
             $this->expect(TokenType::ASSIGN);
