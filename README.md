@@ -7,7 +7,7 @@ An ahead-of-time (AOT) compiler for **Trypillia**, a minimal imperative language
 ## Requirements
 
 - PHP >= 8.1
-- Linux on x86_64 (the compiler emits code for this platform only)
+- Linux on x86_64 (current backend emits code for this platform)
 
 ## Installation
 
@@ -60,18 +60,27 @@ print "Завершено!";
 
 ## Architecture
 
-The compiler is a straightforward four-stage pipeline:
+The compiler uses a portable IR pipeline:
 
 | Stage | Namespace | Responsibility |
 |---|---|---|
 | Lexer | `ChernegaSergiy\TrypilliaCompiler\Lexer` | Source text → token stream |
 | Parser | `ChernegaSergiy\TrypilliaCompiler\Parser` | Token stream → AST |
 | AST | `ChernegaSergiy\TrypilliaCompiler\Ast` | AST node definitions |
-| Code generator | `ChernegaSergiy\TrypilliaCompiler\CodeGen\X86Emitter` | Hand-written x86_64 machine code |
-| Compiler | `ChernegaSergiy\TrypilliaCompiler\Compiler` | Walks the AST and drives the emitter |
+| IR generator | `ChernegaSergiy\TrypilliaCompiler\IR\IRGenerator` | AST → three-address style IR |
+| Backend | `ChernegaSergiy\TrypilliaCompiler\Backend\*` | IR → machine code for a target architecture |
+| x86_64 emitter | `ChernegaSergiy\TrypilliaCompiler\CodeGen\X86Emitter` | Hand-written x86_64 machine code and ELF assembly |
+| Compiler | `ChernegaSergiy\TrypilliaCompiler\Compiler` | Orchestrates AST → IR → backend pipeline |
 | CLI | `ChernegaSergiy\TrypilliaCompiler\Cli\CompilerApplication` | Command-line front end |
 
-`X86Emitter` builds the `.text` and `.data` sections byte by byte and hand assembles a minimal ELF64 executable header and a single `PT_LOAD` program header — there is no relocation table, symbol table, or dynamic linking, so the resulting binaries only run on Linux/x86_64.
+Current backend support:
+
+- ✅ x86_64
+- 🚧 x86
+- 🚧 ARM32
+- 🚧 ARM64
+
+`X86Emitter` builds the `.text` and `.data` sections byte by byte and hand assembles a minimal ELF64 executable header and a single `PT_LOAD` program header — there is no relocation table, symbol table, or dynamic linking, so the resulting binaries currently run only on Linux/x86_64.
 
 ## Testing
 
