@@ -1,5 +1,7 @@
 # Trypillia Compiler
 
+[![CI](https://github.com/ChernegaSergiy/php-elf-compiler/actions/workflows/ci.yml/badge.svg)](https://github.com/ChernegaSergiy/php-elf-compiler/actions/workflows/ci.yml)
+
 An ahead-of-time (AOT) compiler for **Trypillia**, a minimal imperative language. It compiles `.try` source files directly into native, statically linked **x86_64 ELF** executables for Linux — no external assembler, linker, or runtime is involved. The compiler itself is a pure PHP application.
 
 ## Requirements
