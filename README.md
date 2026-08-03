@@ -2,12 +2,12 @@
 
 [![CI](https://github.com/ChernegaSergiy/php-elf-compiler/actions/workflows/ci.yml/badge.svg)](https://github.com/ChernegaSergiy/php-elf-compiler/actions/workflows/ci.yml)
 
-An ahead-of-time (AOT) compiler for **Trypillia**, a minimal imperative language. It compiles `.try` source files directly into native, statically linked **x86_64 ELF** executables for Linux — no external assembler, linker, or runtime is involved. The compiler itself is a pure PHP application.
+An ahead-of-time (AOT) compiler for **Trypillia**, a minimal imperative language. It compiles `.try` source files directly into native, statically linked **ELF** executables for Linux — no external assembler, linker, or runtime is involved. The compiler itself is a pure PHP application.
 
 ## Requirements
 
 - PHP >= 8.1
-- Linux on x86_64 (current backend emits code for this platform)
+- Linux on x86, x86_64, arm32, or arm64
 
 ## Installation
 
@@ -23,10 +23,16 @@ composer install
 ```
 
 ```
-trypillia <file.try> [-o <output>]
+trypillia <file.try> [-o <output>] [-arch <x86|x86_64|arm32|arm64>]
 ```
 
-If `-o` is omitted, the output binary is named after the input file.
+- If `-o` is omitted, the output binary is named after the input file.
+- If `-arch` (or its short form `-a`) is omitted, the target architecture is detected automatically from the host (`php_uname('m')`), so running the compiler on an ARM host (e.g. Termux on armv7l) produces a native ARM binary instead of always defaulting to x86_64.
+
+```bash
+# Explicitly target 32-bit ARM (e.g. cross-compiling from x86_64)
+./bin/trypillia examples/fibonacci.try -o fibonacci -arch arm32
+```
 
 ## Language
 
