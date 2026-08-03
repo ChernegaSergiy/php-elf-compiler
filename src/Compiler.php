@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace ChernegaSergiy\TrypilliaCompiler;
 
 use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;
+use ChernegaSergiy\TrypilliaCompiler\Backend\Arm32BackendEmitter;
+use ChernegaSergiy\TrypilliaCompiler\Backend\Arm64BackendEmitter;
 use ChernegaSergiy\TrypilliaCompiler\Backend\Architecture;
+use ChernegaSergiy\TrypilliaCompiler\Backend\BackendEmitter;
 use ChernegaSergiy\TrypilliaCompiler\Backend\X86BackendEmitter;
 use ChernegaSergiy\TrypilliaCompiler\Midend\IrGenerator;
 use Exception;
@@ -29,12 +32,13 @@ class Compiler
         $backend->emit($program, $filename);
     }
 
-    private static function resolveBackend(Architecture $architecture): X86BackendEmitter
+    private static function resolveBackend(Architecture $architecture): BackendEmitter
     {
-        if ($architecture === Architecture::X86_64) {
-            return new X86BackendEmitter();
-        }
-
-        throw new Exception("Unsupported architecture backend: {$architecture->value}");
+        return match ($architecture) {
+            Architecture::X86_64 => new X86BackendEmitter(),
+            Architecture::ARM64 => new Arm64BackendEmitter(),
+            Architecture::ARM32 => new Arm32BackendEmitter(),
+            default => throw new Exception("Unsupported architecture backend: {$architecture->value}"),
+        };
     }
 }
