@@ -12,6 +12,8 @@ enum TokenType
     case LET;
     case PRINT;
     case WHILE;
+    case IF;
+    case ELSE;
     case IDENTIFIER;
     case NUMBER;
     case STRING;
