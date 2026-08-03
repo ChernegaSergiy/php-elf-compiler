@@ -38,6 +38,9 @@ jobs:
           restore-keys: |
             composer-${{ runner.os }}-${{ runner.arch }}-${{ matrix.php-version }}-
 
+      - name: Install QEMU user-mode emulators
+        run: sudo apt-get update && sudo apt-get install -y qemu-user
+
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress
 
