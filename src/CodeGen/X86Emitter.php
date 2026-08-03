@@ -72,6 +72,12 @@ class X86Emitter
         $this->textSection .= "\x0F\x9C\xC0\x48\x0F\xB6\xC0";
     }
 
+    public function emitSeteRax(): void
+    {
+        // sete al; movzx rax, al
+        $this->textSection .= "\x0F\x94\xC0\x48\x0F\xB6\xC0";
+    }
+
     public function emitCmpRaxImm0(): void
     {
         $this->textSection .= "\x48\x83\xF8\x00"; // cmp rax, 0
