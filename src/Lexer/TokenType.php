@@ -14,6 +14,7 @@ enum TokenType
     case WHILE;
     case IF;
     case ELSE;
+    case NOT;
     case IDENTIFIER;
     case NUMBER;
     case STRING;
