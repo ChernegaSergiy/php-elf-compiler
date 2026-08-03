@@ -3,12 +3,13 @@ let a = 0;
 let b = 1;
 let temp = 0;
 
-print "Починаємо обчислення Фібоначчі:";
+print "Обчислення Фібоначчі:";
 
 while b < max {
+    print b;
     temp = a + b;
     a = b;
     b = temp;
 }
 
-print "Обчислення успішно завершено!";
+print "Завершено!";
