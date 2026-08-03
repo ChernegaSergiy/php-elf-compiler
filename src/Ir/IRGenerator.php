@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ChernegaSergiy\TrypilliaCompiler\IR;
+namespace ChernegaSergiy\TrypilliaCompiler\Ir;
 
 use ChernegaSergiy\TrypilliaCompiler\Ast\AssignStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;

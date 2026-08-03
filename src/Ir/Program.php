@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ChernegaSergiy\TrypilliaCompiler\IR;
+namespace ChernegaSergiy\TrypilliaCompiler\Ir;
 
 /**
  * Ordered list of IR instructions emitted from the AST.

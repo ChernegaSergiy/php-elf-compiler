@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace ChernegaSergiy\TrypilliaCompiler\Backend;
 
-use ChernegaSergiy\TrypilliaCompiler\IR\Program;
+use ChernegaSergiy\TrypilliaCompiler\Ir\Program;
 
 /**
  * Emits a native binary for a specific architecture from a portable IR program.
