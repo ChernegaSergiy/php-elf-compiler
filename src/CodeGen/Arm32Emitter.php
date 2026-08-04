@@ -104,19 +104,24 @@ class Arm32Emitter
         $this->relocations = [];
         $this->internalLabelCounter = 0;
 
-        $stackSize = $this->alignedStackSize();
-        $this->emitPrologue($stackSize);
+        $previous = error_reporting(E_ERROR);
+        try {
+            $stackSize = $this->alignedStackSize();
+            $this->emitPrologue($stackSize);
 
-        foreach ($this->operations as $operation) {
-            $this->emitOperation($operation);
+            foreach ($this->operations as $operation) {
+                $this->emitOperation($operation);
+            }
+
+            $this->patchPendingJumps();
+            $this->emitExitSequence();
+
+            $entryPoint = 0x10054;
+            $dataVirtualAddress = 0x10000 + 84 + strlen($this->textSection);
+            $this->patchDataRelocations($dataVirtualAddress);
+        } finally {
+            error_reporting($previous);
         }
-
-        $this->patchPendingJumps();
-        $this->emitExitSequence();
-
-        $entryPoint = 0x10054;
-        $dataVirtualAddress = 0x10000 + 84 + strlen($this->textSection);
-        $this->patchDataRelocations($dataVirtualAddress);
 
         $fileSize = 84 + strlen($this->textSection) + strlen($this->dataSection);
         $elfHeader = pack(
@@ -470,12 +475,12 @@ class Arm32Emitter
         }
     }
 
-    private function emitWord32(int|float $word): void
+    private function emitWord32(int $word): void
     {
         $this->textSection .= pack('V', $word);
     }
 
-    private function patchWord32(int $offset, int|float $word): void
+    private function patchWord32(int $offset, int $word): void
     {
         $this->textSection = substr_replace($this->textSection, pack('V', $word), $offset, 4);
     }
