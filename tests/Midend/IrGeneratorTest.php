@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace ChernegaSergiy\TrypilliaCompiler\Tests\Midend;
 
+use ChernegaSergiy\TrypilliaCompiler\Midend\Instruction;
 use ChernegaSergiy\TrypilliaCompiler\Midend\IrGenerator;
+use ChernegaSergiy\TrypilliaCompiler\Midend\Operand;
 use ChernegaSergiy\TrypilliaCompiler\Lexer\Lexer;
 use ChernegaSergiy\TrypilliaCompiler\Parser\Parser;
 use PHPUnit\Framework\TestCase;
@@ -20,10 +22,13 @@ class IrGeneratorTest extends TestCase
         $program = (new IrGenerator())->generate($ast);
 
         return array_map(
-            static fn ($instruction): array => [
+            static fn (Instruction $instruction): array => [
                 'opcode' => $instruction->opcode,
                 'result' => $instruction->result,
-                'operands' => $instruction->operands,
+                'operands' => array_map(
+                    static fn (Operand $operand): int|string => $operand->value,
+                    $instruction->operands
+                ),
             ],
             $program->instructions
         );
