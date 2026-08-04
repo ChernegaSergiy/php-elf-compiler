@@ -51,6 +51,9 @@ class IrGenerator
     {
         if ($node instanceof FunctionDecl) {
             $program->beginFunction($node->name, $node->params, $node->returnType);
+            $program->add(new Instruction('func', null, [
+                Operand::temp(self::DEFAULT_WIDTH, $node->name),
+            ]));
 
             foreach ($node->params as $param) {
                 $program->add(new Instruction('param', null, [
@@ -66,6 +69,7 @@ class IrGenerator
                 $program->add(new Instruction('ret', null, []));
             }
 
+            $program->add(new Instruction('end', null, []));
             $program->endFunction();
 
             return;
