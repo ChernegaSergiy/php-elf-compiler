@@ -105,4 +105,21 @@ class CompilerIntegrationTest extends TestCase
 
         $this->assertSame("less\n", $output);
     }
+
+    public function testCompilesAndRunsRecursiveFibonacci(): void
+    {
+        $this->compile('
+            fn fib(n: i64) -> i64 {
+                if n < 2 {
+                    return n;
+                }
+                return fib(n - 1) + fib(n - 2);
+            }
+            print fib(10);
+        ');
+
+        $output = shell_exec(escapeshellarg($this->binaryPath));
+
+        $this->assertSame("55\n", $output);
+    }
 }
