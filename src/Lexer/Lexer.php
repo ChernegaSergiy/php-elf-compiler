@@ -65,9 +65,32 @@ class Lexer
                     $this->tokens[] = new Token(TokenType::NOT, '!');
                 }
             } elseif ($c === '<') {
-                $this->tokens[] = new Token(TokenType::LESS, '<');
+                if ($this->pos < $this->length && $this->source[$this->pos] === '<') {
+                    $this->pos++;
+                    $this->tokens[] = new Token(TokenType::SHL, '<<');
+                } else {
+                    $this->tokens[] = new Token(TokenType::LESS, '<');
+                }
             } elseif ($c === '>') {
-                $this->tokens[] = new Token(TokenType::GREATER, '>');
+                if ($this->pos < $this->length && $this->source[$this->pos] === '>') {
+                    $this->pos++;
+                    if ($this->pos < $this->length && $this->source[$this->pos] === '>') {
+                        $this->pos++;
+                        $this->tokens[] = new Token(TokenType::SHRU, '>>>');
+                    } else {
+                        $this->tokens[] = new Token(TokenType::SHR, '>>');
+                    }
+                } else {
+                    $this->tokens[] = new Token(TokenType::GREATER, '>');
+                }
+            } elseif ($c === '&') {
+                $this->tokens[] = new Token(TokenType::AMP, '&');
+            } elseif ($c === '|') {
+                $this->tokens[] = new Token(TokenType::BITOR, '|');
+            } elseif ($c === '^') {
+                $this->tokens[] = new Token(TokenType::CARET, '^');
+            } elseif ($c === '~') {
+                $this->tokens[] = new Token(TokenType::TILDE, '~');
             } elseif ($c === '{') {
                 $this->tokens[] = new Token(TokenType::LBRACE, '{');
             } elseif ($c === '}') {
