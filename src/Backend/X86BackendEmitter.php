@@ -104,6 +104,11 @@ class X86BackendEmitter implements BackendEmitter
                     $emitter->addRaxRdx();
                 });
                 break;
+            case 'sub_int':
+                $this->emitBinaryMath($instruction, static function (X86Emitter $emitter): void {
+                    $emitter->subRaxRdx();
+                });
+                break;
             case 'cmp_lt':
                 $this->emitBinaryCompare($instruction, static function (X86Emitter $emitter): void {
                     $emitter->emitSetlRax();
