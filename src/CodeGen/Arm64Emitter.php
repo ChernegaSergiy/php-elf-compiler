@@ -676,7 +676,7 @@ class Arm64Emitter
                 throw new Exception("Unknown ARM64 branch label: {$jump['label']}");
             }
 
-            $deltaBytes = $target - $jump['offset'];
+            $deltaBytes = $target - $jump['offset'] - 4;
             if ($deltaBytes % 4 !== 0) {
                 throw new Exception('Unaligned ARM64 branch target');
             }
