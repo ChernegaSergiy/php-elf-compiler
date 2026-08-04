@@ -50,7 +50,7 @@ class IrGenerator
     private function compileStmt(AstNode $node, Program $program): void
     {
         if ($node instanceof FunctionDecl) {
-            $program->beginFunction($node->name);
+            $program->beginFunction($node->name, $node->params, $node->returnType);
 
             foreach ($node->params as $param) {
                 $program->add(new Instruction('param', null, [
@@ -278,7 +278,7 @@ class IrGenerator
     private function lastInstructionIsRet(Program $program): bool
     {
         $instructions = $program->isInsideFunction()
-            ? $program->functions[array_key_last($program->functions)]
+            ? $program->functions[array_key_last($program->functions)]->instructions
             : $program->instructions;
 
         return $instructions !== [] && end($instructions)->opcode === 'ret';
