@@ -65,6 +65,11 @@ class Arm64Emitter
         $this->operations[] = ['opcode' => 'add', 'operands' => [$destination, $left, $right]];
     }
 
+    public function sub(string $destination, string $left, string $right): void
+    {
+        $this->operations[] = ['opcode' => 'sub', 'operands' => [$destination, $left, $right]];
+    }
+
     public function cmp(string $left, string $right): void
     {
         $this->operations[] = ['opcode' => 'cmp', 'operands' => [$left, $right]];
@@ -247,6 +252,13 @@ class Arm64Emitter
                     $this->register((string) $operands[2]),
                 );
                 break;
+            case 'sub':
+                $this->emitSub(
+                    $this->register((string) $operands[0]),
+                    $this->register((string) $operands[1]),
+                    $this->register((string) $operands[2]),
+                );
+                break;
             case 'and':
                 $this->emitAnd(
                     $this->register((string) $operands[0]),
@@ -403,6 +415,12 @@ class Arm64Emitter
     private function emitAdd(int $destination, int $left, int $right): void
     {
         $this->emitWord32(0x8B000000 | ($right << 16) | ($left << 5) | $destination);
+    }
+
+    private function emitSub(int $destination, int $left, int $right): void
+    {
+        // SUB Xd, Xn, Xm
+        $this->emitWord32(0xCB000000 | ($right << 16) | ($left << 5) | $destination);
     }
 
     private function emitAnd(int $destination, int $left, int $right): void
