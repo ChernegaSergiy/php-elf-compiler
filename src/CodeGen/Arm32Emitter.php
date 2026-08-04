@@ -19,7 +19,7 @@ class Arm32Emitter
 
     private int $stackOffset = 0;
 
-    private string $textSection = '';
+    private ByteBuffer $text;
 
     private string $dataSection = '';
 
@@ -35,26 +35,34 @@ class Arm32Emitter
     private int $internalLabelCounter = 0;
 
     /**
-     * Builds a 32-bit word from two 16-bit halves using arithmetic.
+     * Builds a 32-bit word from two 16-bit halves via ByteBuffer.
      *
      * On 32-bit PHP, hex literals >= 0x80000000 become floats and
      * bitwise OR with floats triggers E_WARNING. Combining the two
-     * halves via multiplication doesn't avoid this: the result can
-     * still overflow PHP_INT_MAX on 32-bit builds and become a float,
-     * which pack('V', ...) cannot losslessly cast back to an int (this
-     * is what produced the "float is not representable as an int"
-     * warnings, and risked corrupting emitted bytes).
+     * halves via multiplication or a single OR doesn't avoid this: the
+     * result can still overflow PHP_INT_MAX on 32-bit builds and become
+     * a float, which pack('V', ...) cannot losslessly cast back to an
+     * int (this is what originally produced "float is not representable
+     * as an int" warnings, and risked corrupting emitted bytes).
      *
-     * Instead we never materialize the combined word as a PHP number
-     * at all: each 16-bit half is packed independently (masked to
-     * 0xFFFF so it always fits in a small positive int on any
-     * platform) and the two byte strings are concatenated in
-     * little-endian order. This is immune to int-size issues on
-     * 32-bit or 64-bit PHP alike.
+     * ByteBuffer never materializes the combined word as a PHP number at
+     * all: each 16-bit half is packed independently and the two byte
+     * strings are concatenated in little-endian order (see RFC-0001
+     * §5.1). This is immune to int-size issues on 32-bit or 64-bit PHP
+     * alike.
      */
     private static function w(int $hi16, int $lo16): string
     {
-        return pack('v', $lo16 & 0xFFFF) . pack('v', $hi16 & 0xFFFF);
+        $word = new ByteBuffer();
+        $word->pushU16LE($lo16);
+        $word->pushU16LE($hi16);
+
+        return $word->bytes();
+    }
+
+    public function __construct()
+    {
+        $this->text = new ByteBuffer();
     }
 
     public function movImm(string $register, int $value): void
@@ -120,7 +128,7 @@ class Arm32Emitter
 
     public function generateBinary(string $filename): void
     {
-        $this->textSection = '';
+        $this->text = new ByteBuffer();
         $this->dataSection = '';
         $this->labels = [];
         $this->pendingJumps = [];
@@ -138,10 +146,10 @@ class Arm32Emitter
         $this->emitExitSequence();
 
         $entryPoint = 0x10054;
-        $dataVirtualAddress = 0x10000 + 84 + strlen($this->textSection);
+        $dataVirtualAddress = 0x10000 + 84 + $this->text->length();
         $this->patchDataRelocations($dataVirtualAddress);
 
-        $fileSize = 84 + strlen($this->textSection) + strlen($this->dataSection);
+        $fileSize = 84 + $this->text->length() + strlen($this->dataSection);
         $elfHeader = pack(
             'C16vvVVVVVvvvvvv',
             0x7F,
@@ -176,7 +184,7 @@ class Arm32Emitter
         );
         $programHeader = pack('VVVVVVVV', 1, 0, 0x10000, 0x10000, $fileSize, $fileSize, 5, 0x1000);
 
-        file_put_contents($filename, $elfHeader . $programHeader . $this->textSection . $this->dataSection);
+        file_put_contents($filename, $elfHeader . $programHeader . $this->text->bytes() . $this->dataSection);
         chmod($filename, 0755);
     }
 
@@ -418,7 +426,7 @@ class Arm32Emitter
         $length = strlen($value) + 1;
 
         $this->emitMovImm32(0, 1); // fd stdout
-        $relocOffset = strlen($this->textSection);
+        $relocOffset = $this->text->length();
         $this->emitMovImm32(1, 0); // patched abs data address
         $this->relocations[] = ['codeOffset' => $relocOffset, 'register' => 'r1', 'dataOffset' => $dataOffset];
         $this->emitMovImm32(2, $length);
@@ -448,7 +456,7 @@ class Arm32Emitter
 
     private function emitBranchPlaceholder(string $label, int $condition): void
     {
-        $offset = strlen($this->textSection);
+        $offset = $this->text->length();
         // b: cond 1010 imm24
         $this->emitWord32(self::w(($condition << 12) | 0x0A00, 0));
         $this->pendingJumps[] = ['offset' => $offset, 'kind' => 'b', 'label' => $label, 'condition' => (string) $condition];
@@ -460,7 +468,7 @@ class Arm32Emitter
             throw new Exception("Duplicate ARM32 label: {$label}");
         }
 
-        $this->labels[$label] = strlen($this->textSection);
+        $this->labels[$label] = $this->text->length();
     }
 
     private function patchPendingJumps(): void
@@ -508,12 +516,12 @@ class Arm32Emitter
 
     private function emitWord32(string $word): void
     {
-        $this->textSection .= $word;
+        $this->text->pushRaw($word);
     }
 
     private function patchWord32(int $offset, string $word): void
     {
-        $this->textSection = substr_replace($this->textSection, $word, $offset, 4);
+        $this->text->patchRaw($offset, $word);
     }
 
     private function register(string $register): int
