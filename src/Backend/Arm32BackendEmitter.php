@@ -26,6 +26,12 @@ class Arm32BackendEmitter implements BackendEmitter
     {
         $this->emitter = new Arm32Emitter();
 
+        foreach ($program->functions as $function) {
+            foreach ($function->instructions as $instruction) {
+                $this->emitInstruction($instruction);
+            }
+        }
+
         foreach ($program->instructions as $instruction) {
             $this->emitInstruction($instruction);
         }
@@ -122,6 +128,13 @@ class Arm32BackendEmitter implements BackendEmitter
             case 'label':
                 $label = $this->stringOperand($instruction, 0);
                 $this->emitter->label($label);
+                break;
+            case 'func':
+            case 'end':
+            case 'param':
+            case 'call':
+            case 'arg':
+            case 'ret':
                 break;
             default:
                 throw new Exception('Unsupported IR opcode for ARM32 backend: ' . $instruction->opcode);
