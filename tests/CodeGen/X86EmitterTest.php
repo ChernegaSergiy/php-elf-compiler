@@ -12,9 +12,9 @@ class X86EmitterTest extends TestCase
 {
     private function textSectionOf(X86Emitter $emitter): string
     {
-        $property = new ReflectionProperty(X86Emitter::class, 'textSection');
+        $property = new ReflectionProperty(X86Emitter::class, 'text');
 
-        return $property->getValue($emitter);
+        return $property->getValue($emitter)->bytes();
     }
 
     public function testMovRaxImmEmitsExpectedOpcode(): void

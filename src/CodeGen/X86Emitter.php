@@ -11,7 +11,7 @@ use Exception;
  */
 class X86Emitter
 {
-    private string $textSection = '';
+    private ByteBuffer $text;
 
     private string $dataSection = '';
 
@@ -23,24 +23,30 @@ class X86Emitter
     /** @var array<int, array{codeOffset: int, dataOffset: int}> */
     private array $relocations = [];
 
+    public function __construct()
+    {
+        $this->text = new ByteBuffer();
+    }
+
     public function movRaxImm(int $val): void
     {
-        $this->textSection .= "\x48\xC7\xC0" . pack('V', $val);
+        $this->text->pushRaw("\x48\xC7\xC0");
+        $this->text->pushU32LE($val);
     }
 
     public function pushRax(): void
     {
-        $this->textSection .= "\x50";
+        $this->text->pushRaw("\x50");
     }
 
     public function popRdx(): void
     {
-        $this->textSection .= "\x5A";
+        $this->text->pushRaw("\x5A");
     }
 
     public function addRaxRdx(): void
     {
-        $this->textSection .= "\x48\x01\xD0";
+        $this->text->pushRaw("\x48\x01\xD0");
     }
 
     public function storeLocal(string $name): void
@@ -51,47 +57,47 @@ class X86Emitter
         }
         $offset = $this->symbols[$name];
         // mov [rbp + offset], rax
-        $this->textSection .= "\x48\x89\x45" . chr(256 + $offset);
+        $this->text->pushRaw("\x48\x89\x45" . chr(256 + $offset));
     }
 
     public function loadLocal(string $name): void
     {
         $offset = $this->symbols[$name] ?? throw new Exception("Unknown variable: $name");
         // mov rax, [rbp + offset]
-        $this->textSection .= "\x48\x8B\x45" . chr(256 + $offset);
+        $this->text->pushRaw("\x48\x8B\x45" . chr(256 + $offset));
     }
 
     public function emitCmpRaxRdx(): void
     {
-        $this->textSection .= "\x48\x39\xD0"; // cmp rax, rdx
+        $this->text->pushRaw("\x48\x39\xD0"); // cmp rax, rdx
     }
 
     public function emitSetlRax(): void
     {
         // setl al; movzx rax, al
-        $this->textSection .= "\x0F\x9C\xC0\x48\x0F\xB6\xC0";
+        $this->text->pushRaw("\x0F\x9C\xC0\x48\x0F\xB6\xC0");
     }
 
     public function emitSeteRax(): void
     {
         // sete al; movzx rax, al
-        $this->textSection .= "\x0F\x94\xC0\x48\x0F\xB6\xC0";
+        $this->text->pushRaw("\x0F\x94\xC0\x48\x0F\xB6\xC0");
     }
 
     public function emitSetneRax(): void
     {
         // setne al; movzx rax, al
-        $this->textSection .= "\x0F\x95\xC0\x48\x0F\xB6\xC0";
+        $this->text->pushRaw("\x0F\x95\xC0\x48\x0F\xB6\xC0");
     }
 
     public function emitCmpRaxImm0(): void
     {
-        $this->textSection .= "\x48\x83\xF8\x00"; // cmp rax, 0
+        $this->text->pushRaw("\x48\x83\xF8\x00"); // cmp rax, 0
     }
 
     public function getCurrentOffset(): int
     {
-        return strlen($this->textSection);
+        return $this->text->length();
     }
 
     /**
@@ -100,9 +106,9 @@ class X86Emitter
      */
     public function emitJe_ForwardPlaceholder(): int
     {
-        $this->textSection .= "\x0F\x84"; // je rel32
-        $offset = strlen($this->textSection);
-        $this->textSection .= "\x00\x00\x00\x00";
+        $this->text->pushRaw("\x0F\x84"); // je rel32
+        $offset = $this->text->length();
+        $this->text->pushRaw("\x00\x00\x00\x00");
 
         return $offset;
     }
@@ -113,9 +119,9 @@ class X86Emitter
      */
     public function emitJne_ForwardPlaceholder(): int
     {
-        $this->textSection .= "\x0F\x85"; // jne rel32
-        $offset = strlen($this->textSection);
-        $this->textSection .= "\x00\x00\x00\x00";
+        $this->text->pushRaw("\x0F\x85"); // jne rel32
+        $offset = $this->text->length();
+        $this->text->pushRaw("\x00\x00\x00\x00");
 
         return $offset;
     }
@@ -125,9 +131,10 @@ class X86Emitter
      */
     public function emitJmp_Backward(int $target): void
     {
-        $current = strlen($this->textSection);
+        $current = $this->text->length();
         $rel = $target - ($current + 5);
-        $this->textSection .= "\xE9" . pack('V', $rel);
+        $this->text->pushRaw("\xE9");
+        $this->text->pushU32LE($rel);
     }
 
     /**
@@ -136,9 +143,9 @@ class X86Emitter
      */
     public function emitJmp_ForwardPlaceholder(): int
     {
-        $this->textSection .= "\xE9"; // jmp rel32
-        $offset = strlen($this->textSection);
-        $this->textSection .= "\x00\x00\x00\x00";
+        $this->text->pushRaw("\xE9"); // jmp rel32
+        $offset = $this->text->length();
+        $this->text->pushRaw("\x00\x00\x00\x00");
 
         return $offset;
     }
@@ -149,9 +156,9 @@ class X86Emitter
      */
     public function patchForwardJump(int $offset): void
     {
-        $current = strlen($this->textSection);
+        $current = $this->text->length();
         $rel = $current - ($offset + 4);
-        $this->textSection = substr_replace($this->textSection, pack('V', $rel), $offset, 4);
+        $this->text->patchU32LE($offset, $rel);
     }
 
     /**
@@ -160,7 +167,7 @@ class X86Emitter
      */
     public function emitPrintNumberInRax(): void
     {
-        $this->textSection .=
+        $this->text->pushRaw(
             "\x49\x89\xE2" .                 // mov r10, rsp (save stack pointer)
             "\x48\x83\xEC\x20" .             // sub rsp, 32 (stack buffer)
             "\x49\x89\xE3" .                 // mov r11, rsp
@@ -186,7 +193,8 @@ class X86Emitter
             "\x48\xC7\xC7\x01\x00\x00\x00" . // mov rdi, 1 (stdout)
             "\x4C\x89\xC6" .                 // mov rsi, r8 (buffer start)
             "\x0F\x05" .                     // syscall
-            "\x4C\x89\xD4";                  // mov rsp, r10 (restore stack pointer)
+            "\x4C\x89\xD4"                   // mov rsp, r10 (restore stack pointer)
+        );
     }
 
     public function emitPrintString(string $str): void
@@ -195,21 +203,22 @@ class X86Emitter
         $this->dataSection .= $str . "\n";
         $strLen = strlen($str) + 1;
 
-        $this->textSection .= "\x48\xC7\xC0\x01\x00\x00\x00"; // mov rax, 1 (sys_write)
-        $this->textSection .= "\x48\xC7\xC7\x01\x00\x00\x00"; // mov rdi, 1 (stdout)
+        $this->text->pushRaw("\x48\xC7\xC0\x01\x00\x00\x00"); // mov rax, 1 (sys_write)
+        $this->text->pushRaw("\x48\xC7\xC7\x01\x00\x00\x00"); // mov rdi, 1 (stdout)
 
-        $this->textSection .= "\x48\xC7\xC6"; // mov rsi, imm32 (patched below)
-        $this->relocations[] = ['codeOffset' => strlen($this->textSection), 'dataOffset' => $dataLabelOffset];
-        $this->textSection .= pack('V', 0);
+        $this->text->pushRaw("\x48\xC7\xC6"); // mov rsi, imm32 (patched below)
+        $this->relocations[] = ['codeOffset' => $this->text->length(), 'dataOffset' => $dataLabelOffset];
+        $this->text->pushU32LE(0);
 
-        $this->textSection .= "\x48\xC7\xC2" . pack('V', $strLen); // mov rdx, length
-        $this->textSection .= "\x0F\x05"; // syscall
+        $this->text->pushRaw("\x48\xC7\xC2"); // mov rdx, imm32
+        $this->text->pushU32LE($strLen); // length
+        $this->text->pushRaw("\x0F\x05"); // syscall
     }
 
     public function generateBinary(string $filename): void
     {
-        $this->textSection .= "\x48\xC7\xC7\x00\x00\x00\x00"; // mov rdi, 0 (exit status)
-        $this->textSection .= "\x48\xC7\xC0\x3C\x00\x00\x00\x0F\x05"; // sys_exit
+        $this->text->pushRaw("\x48\xC7\xC7\x00\x00\x00\x00"); // mov rdi, 0 (exit status)
+        $this->text->pushRaw("\x48\xC7\xC0\x3C\x00\x00\x00\x0F\x05"); // sys_exit
 
         $entry_point = 0x400078;
 
@@ -217,14 +226,14 @@ class X86Emitter
         $prologue = "\x55\x48\x89\xE5\x48\x81\xEC\x00\x01\x00\x00";
         $prologueLen = strlen($prologue);
 
-        $dataVirtualAddress = 0x400000 + 120 + $prologueLen + strlen($this->textSection);
+        $dataVirtualAddress = 0x400000 + 120 + $prologueLen + $this->text->length();
 
         foreach ($this->relocations as $reloc) {
             $absoluteAddress = $dataVirtualAddress + $reloc['dataOffset'];
-            $this->textSection = substr_replace($this->textSection, pack('V', $absoluteAddress), $reloc['codeOffset'], 4);
+            $this->text->patchU32LE($reloc['codeOffset'], $absoluteAddress);
         }
 
-        $codeSize = strlen($this->textSection);
+        $codeSize = $this->text->length();
         $fileSize = 120 + $prologueLen + $codeSize + strlen($this->dataSection);
 
         $elfHeader = pack(
@@ -261,7 +270,7 @@ class X86Emitter
         );
         $programHeader = pack('VVPPPPPP', 1, 5, 0, 0x400000, 0x400000, $fileSize, $fileSize, 0x1000);
 
-        file_put_contents($filename, $elfHeader . $programHeader . $prologue . $this->textSection . $this->dataSection);
+        file_put_contents($filename, $elfHeader . $programHeader . $prologue . $this->text->bytes() . $this->dataSection);
         chmod($filename, 0755);
     }
 }
