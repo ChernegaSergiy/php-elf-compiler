@@ -19,7 +19,7 @@ class Arm64Emitter
 
     private int $stackOffset = 0;
 
-    private string $textSection = '';
+    private ByteBuffer $text;
 
     private string $dataSection = '';
 
@@ -33,6 +33,11 @@ class Arm64Emitter
     private array $relocations = [];
 
     private int $internalLabelCounter = 0;
+
+    public function __construct()
+    {
+        $this->text = new ByteBuffer();
+    }
 
     public function movImm(string $register, int $value): void
     {
@@ -97,7 +102,7 @@ class Arm64Emitter
 
     public function generateBinary(string $filename): void
     {
-        $this->textSection = '';
+        $this->text = new ByteBuffer();
         $this->dataSection = '';
         $this->labels = [];
         $this->pendingJumps = [];
@@ -115,10 +120,10 @@ class Arm64Emitter
         $this->emitExitSequence();
 
         $entryPoint = 0x400078;
-        $dataVirtualAddress = 0x400000 + 120 + strlen($this->textSection);
+        $dataVirtualAddress = 0x400000 + 120 + $this->text->length();
         $this->patchDataRelocations($dataVirtualAddress);
 
-        $fileSize = 120 + strlen($this->textSection) + strlen($this->dataSection);
+        $fileSize = 120 + $this->text->length() + strlen($this->dataSection);
         $elfHeader = pack(
             'C16vvVPPPVvvvvvv',
             0x7F,
@@ -153,7 +158,7 @@ class Arm64Emitter
         );
         $programHeader = pack('VVPPPPPP', 1, 5, 0, 0x400000, 0x400000, $fileSize, $fileSize, 0x1000);
 
-        file_put_contents($filename, $elfHeader . $programHeader . $this->textSection . $this->dataSection);
+        file_put_contents($filename, $elfHeader . $programHeader . $this->text->bytes() . $this->dataSection);
         chmod($filename, 0755);
     }
 
@@ -333,7 +338,7 @@ class Arm64Emitter
         $length = strlen($value) + 1;
 
         $this->emitMovImm64(0, 1); // stdout fd
-        $relocOffset = strlen($this->textSection);
+        $relocOffset = $this->text->length();
         $this->emitMovImm64(1, 0); // patched to absolute data address
         $this->relocations[] = ['codeOffset' => $relocOffset, 'register' => 'x1', 'dataOffset' => $dataOffset];
         $this->emitMovImm64(2, $length); // len
@@ -406,7 +411,7 @@ class Arm64Emitter
 
     private function emitBranchPlaceholder(string $label): void
     {
-        $offset = strlen($this->textSection);
+        $offset = $this->text->length();
         $this->emitWord32(0x14000000);
         $this->pendingJumps[] = ['offset' => $offset, 'kind' => 'b', 'label' => $label];
     }
@@ -414,7 +419,7 @@ class Arm64Emitter
     private function emitCbzPlaceholder(string $register, string $label): void
     {
         $rt = $this->register($register);
-        $offset = strlen($this->textSection);
+        $offset = $this->text->length();
         $this->emitWord32(0xB4000000 | $rt);
         $this->pendingJumps[] = ['offset' => $offset, 'kind' => 'cbz', 'label' => $label, 'register' => $register];
     }
@@ -422,7 +427,7 @@ class Arm64Emitter
     private function emitBranchCondPlaceholder(string $condition, string $label): void
     {
         $cond = $this->conditionCode($condition);
-        $offset = strlen($this->textSection);
+        $offset = $this->text->length();
         $this->emitWord32(0x54000000 | $cond);
         $this->pendingJumps[] = ['offset' => $offset, 'kind' => 'bcond', 'label' => $label, 'condition' => $condition];
     }
@@ -433,7 +438,7 @@ class Arm64Emitter
             throw new Exception("Duplicate ARM64 label: {$label}");
         }
 
-        $this->labels[$label] = strlen($this->textSection);
+        $this->labels[$label] = $this->text->length();
     }
 
     private function patchPendingJumps(): void
@@ -477,12 +482,12 @@ class Arm64Emitter
 
     private function emitWord32(int $word): void
     {
-        $this->textSection .= pack('V', $word);
+        $this->text->pushU32LE($word);
     }
 
     private function patchWord32(int $offset, int $word): void
     {
-        $this->textSection = substr_replace($this->textSection, pack('V', $word), $offset, 4);
+        $this->text->patchU32LE($offset, $word);
     }
 
     /**
