@@ -6,6 +6,7 @@ namespace ChernegaSergiy\TrypilliaCompiler\Tests\Parser;
 
 use ChernegaSergiy\TrypilliaCompiler\Ast\AssignStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BinOpNode;
+use ChernegaSergiy\TrypilliaCompiler\Ast\BitNotNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\IfStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\LetStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NotNode;
@@ -117,5 +118,115 @@ class ParserTest extends TestCase
         $this->assertInstanceOf(LetStmt::class, $stmt);
         $this->assertInstanceOf(NotNode::class, $stmt->expr);
         $this->assertInstanceOf(VarNode::class, $stmt->expr->expr);
+    }
+
+    public function testParsesBitwiseAnd(): void
+    {
+        [$stmt] = $this->parse('let x = a & b;');
+
+        $this->assertInstanceOf(LetStmt::class, $stmt);
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr);
+        $this->assertSame('&', $stmt->expr->op);
+        $this->assertInstanceOf(VarNode::class, $stmt->expr->left);
+        $this->assertInstanceOf(VarNode::class, $stmt->expr->right);
+    }
+
+    public function testParsesBitwiseOr(): void
+    {
+        [$stmt] = $this->parse('let x = a | b;');
+
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr);
+        $this->assertSame('|', $stmt->expr->op);
+    }
+
+    public function testParsesBitwiseXor(): void
+    {
+        [$stmt] = $this->parse('let x = a ^ b;');
+
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr);
+        $this->assertSame('^', $stmt->expr->op);
+    }
+
+    public function testParsesBitwiseNot(): void
+    {
+        [$stmt] = $this->parse('let x = ~a;');
+
+        $this->assertInstanceOf(LetStmt::class, $stmt);
+        $this->assertInstanceOf(BitNotNode::class, $stmt->expr);
+        $this->assertInstanceOf(VarNode::class, $stmt->expr->expr);
+    }
+
+    public function testParsesShiftLeft(): void
+    {
+        [$stmt] = $this->parse('let x = a << b;');
+
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr);
+        $this->assertSame('<<', $stmt->expr->op);
+    }
+
+    public function testParsesShiftRight(): void
+    {
+        [$stmt] = $this->parse('let x = a >> b;');
+
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr);
+        $this->assertSame('>>', $stmt->expr->op);
+    }
+
+    public function testParsesUnsignedShiftRight(): void
+    {
+        [$stmt] = $this->parse('let x = a >>> b;');
+
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr);
+        $this->assertSame('>>>', $stmt->expr->op);
+    }
+
+    public function testBitwiseNotHasHigherPrecedenceThanShift(): void
+    {
+        [$stmt] = $this->parse('let x = ~a << b;');
+
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr);
+        $this->assertSame('<<', $stmt->expr->op);
+        $this->assertInstanceOf(BitNotNode::class, $stmt->expr->left);
+        $this->assertInstanceOf(VarNode::class, $stmt->expr->right);
+    }
+
+    public function testShiftHasHigherPrecedenceThanBitwiseAnd(): void
+    {
+        [$stmt] = $this->parse('let x = a << b & c;');
+
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr);
+        $this->assertSame('&', $stmt->expr->op);
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr->left);
+        $this->assertSame('<<', $stmt->expr->left->op);
+    }
+
+    public function testBitwiseAndHasHigherPrecedenceThanBitwiseXor(): void
+    {
+        [$stmt] = $this->parse('let x = a & b ^ c;');
+
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr);
+        $this->assertSame('^', $stmt->expr->op);
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr->left);
+        $this->assertSame('&', $stmt->expr->left->op);
+    }
+
+    public function testBitwiseXorHasHigherPrecedenceThanBitwiseOr(): void
+    {
+        [$stmt] = $this->parse('let x = a ^ b | c;');
+
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr);
+        $this->assertSame('|', $stmt->expr->op);
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr->left);
+        $this->assertSame('^', $stmt->expr->left->op);
+    }
+
+    public function testAdditionHasHigherPrecedenceThanBitwiseOr(): void
+    {
+        [$stmt] = $this->parse('let x = a + b | c;');
+
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr);
+        $this->assertSame('|', $stmt->expr->op);
+        $this->assertInstanceOf(BinOpNode::class, $stmt->expr->left);
+        $this->assertSame('+', $stmt->expr->left->op);
     }
 }
