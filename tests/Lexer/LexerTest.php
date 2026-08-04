@@ -181,4 +181,76 @@ class LexerTest extends TestCase
             array_map(static fn ($token) => $token->type, $tokens),
         );
     }
+
+    public function testTokenizesFnKeyword(): void
+    {
+        $tokens = Lexer::run('fn main() { }');
+
+        $this->assertSame(
+            [TokenType::FN, TokenType::IDENTIFIER, TokenType::LPAREN, TokenType::RPAREN, TokenType::LBRACE, TokenType::RBRACE, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
+
+    public function testTokenizesReturnKeyword(): void
+    {
+        $tokens = Lexer::run('return 42;');
+
+        $this->assertSame(
+            [TokenType::RETURN, TokenType::NUMBER, TokenType::SEMICOLON, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
+
+    public function testTokenizesArrow(): void
+    {
+        $tokens = Lexer::run('-> i64');
+
+        $this->assertSame(
+            [TokenType::ARROW, TokenType::IDENTIFIER, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
+
+    public function testTokenizesFunctionDeclaration(): void
+    {
+        $tokens = Lexer::run('fn add(a: i64, b: i64) -> i64 { return a + b; }');
+
+        $this->assertSame(
+            [
+                TokenType::FN,
+                TokenType::IDENTIFIER,
+                TokenType::LPAREN,
+                TokenType::IDENTIFIER,
+                TokenType::COLON,
+                TokenType::IDENTIFIER,
+                TokenType::COMMA,
+                TokenType::IDENTIFIER,
+                TokenType::COLON,
+                TokenType::IDENTIFIER,
+                TokenType::RPAREN,
+                TokenType::ARROW,
+                TokenType::IDENTIFIER,
+                TokenType::LBRACE,
+                TokenType::RETURN,
+                TokenType::IDENTIFIER,
+                TokenType::PLUS,
+                TokenType::IDENTIFIER,
+                TokenType::SEMICOLON,
+                TokenType::RBRACE,
+                TokenType::EOF,
+            ],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
+
+    public function testTokenizesFunctionCall(): void
+    {
+        $tokens = Lexer::run('add(1, 2)');
+
+        $this->assertSame(
+            [TokenType::IDENTIFIER, TokenType::LPAREN, TokenType::NUMBER, TokenType::COMMA, TokenType::NUMBER, TokenType::RPAREN, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
 }
