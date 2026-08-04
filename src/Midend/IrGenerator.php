@@ -7,6 +7,7 @@ namespace ChernegaSergiy\TrypilliaCompiler\Midend;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AssignStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BinOpNode;
+use ChernegaSergiy\TrypilliaCompiler\Ast\BitNotNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\IfStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\LetStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NotNode;
@@ -165,6 +166,12 @@ class IrGenerator
                 '<' => 'cmp_lt',
                 '==' => 'cmp_eq',
                 '!=' => 'cmp_ne',
+                '&' => 'bit_and',
+                '|' => 'bit_or',
+                '^' => 'bit_xor',
+                '<<' => 'shl',
+                '>>' => 'shr',
+                '>>>' => 'shr_u',
                 default => throw new Exception("Unsupported binary operator: {$node->op}"),
             };
 
@@ -181,6 +188,16 @@ class IrGenerator
             $valueTemp = $this->compileExpr($node->expr, $program);
             $temp = $this->nextTemp();
             $program->add(new Instruction('not_bool', $temp, [
+                Operand::temp(self::DEFAULT_WIDTH, $valueTemp),
+            ]));
+
+            return $temp;
+        }
+
+        if ($node instanceof BitNotNode) {
+            $valueTemp = $this->compileExpr($node->expr, $program);
+            $temp = $this->nextTemp();
+            $program->add(new Instruction('bit_not', $temp, [
                 Operand::temp(self::DEFAULT_WIDTH, $valueTemp),
             ]));
 
