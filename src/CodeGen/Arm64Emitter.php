@@ -736,7 +736,11 @@ class Arm64Emitter
 
     private function register(string $register): int
     {
-        if (!preg_match('/^x([0-9]|[12][0-9]|30)$/', $register, $matches)) {
+        if ($register === 'sp') {
+            return 31;
+        }
+
+        if (!preg_match('/^x([0-9]|[12][0-9]|3[01])$/', $register, $matches)) {
             throw new Exception("Unsupported ARM64 register: {$register}");
         }
 
