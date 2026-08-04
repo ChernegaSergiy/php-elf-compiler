@@ -6,12 +6,21 @@ namespace ChernegaSergiy\TrypilliaCompiler\Backend;
 
 use ChernegaSergiy\TrypilliaCompiler\CodeGen\X86Emitter;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Instruction;
+use ChernegaSergiy\TrypilliaCompiler\Midend\IrFunction;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Operand;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Program;
 use Exception;
 
 /**
  * Emits x86_64 machine code from portable IR instructions.
+ *
+ * Calling convention (SysV AMD64 ABI):
+ *   Args: rdi, rsi, rdx, rcx, r8, r9 (first 6)
+ *   Return: rax
+ *   Callee-saved: rbx, rbp, r12-r15
+ *   Frame pointer: rbp
+ *   Prologue: push rbp; mov rbp, rsp; sub rsp, N
+ *   Epilogue: leave; ret
  */
 class X86BackendEmitter implements BackendEmitter
 {
@@ -22,6 +31,10 @@ class X86BackendEmitter implements BackendEmitter
 
     /** @var array<string, int[]> */
     private array $pendingJumps = [];
+
+    private int $argIndex = 0;
+
+    private const ARG_REGS = ['rdi', 'rsi', 'rdx', 'rcx', 'r8', 'r9'];
 
     public function targetArchitecture(): Architecture
     {
@@ -35,9 +48,7 @@ class X86BackendEmitter implements BackendEmitter
         $this->pendingJumps = [];
 
         foreach ($program->functions as $function) {
-            foreach ($function->instructions as $instruction) {
-                $this->emitInstruction($instruction);
-            }
+            $this->emitFunction($function);
         }
 
         foreach ($program->instructions as $instruction) {
@@ -50,6 +61,21 @@ class X86BackendEmitter implements BackendEmitter
         }
 
         $this->emitter->generateBinary($filename);
+    }
+
+    private function emitFunction(IrFunction $function): void
+    {
+        $this->argIndex = 0;
+
+        $this->emitter->label('func_' . $function->name);
+
+        // Prologue
+        $this->emitter->pushReg('rbp');
+        $this->emitter->movReg('rbp', 'rsp');
+
+        foreach ($function->instructions as $instruction) {
+            $this->emitInstruction($instruction);
+        }
     }
 
     private function emitInstruction(Instruction $instruction): void
@@ -176,15 +202,74 @@ class X86BackendEmitter implements BackendEmitter
                 $this->defineLabel($label);
                 break;
             case 'func':
+                break;
             case 'end':
+                break;
             case 'param':
+                $this->emitParam($instruction);
+                break;
             case 'call':
+                $this->emitCall($instruction);
+                break;
             case 'arg':
+                $this->emitArg($instruction);
+                break;
             case 'ret':
+                $this->emitRet($instruction);
                 break;
             default:
                 throw new Exception('Unsupported IR opcode for x86 backend: ' . $instruction->opcode);
         }
+    }
+
+    private function emitParam(Instruction $instruction): void
+    {
+        if ($this->argIndex < count(self::ARG_REGS)) {
+            $reg = self::ARG_REGS[$this->argIndex];
+            $this->emitter->movReg($reg, 'rax');
+            $this->emitter->storeLocal($this->stringOperand($instruction, 0));
+        }
+        $this->argIndex++;
+    }
+
+    private function emitArg(Instruction $instruction): void
+    {
+        if ($this->argIndex < count(self::ARG_REGS)) {
+            $reg = self::ARG_REGS[$this->argIndex];
+            $name = $this->stringOperand($instruction, 0);
+            $this->emitter->loadLocal($name);
+            $this->emitter->movReg($reg, 'rax');
+        }
+        $this->argIndex++;
+    }
+
+    private function emitCall(Instruction $instruction): void
+    {
+        $name = $this->stringOperand($instruction, 0);
+        $this->argIndex = 0;
+
+        $callOffset = $this->emitter->getCurrentOffset();
+        $this->emitter->callRel32(0); // placeholder
+        $this->pendingJumps['call_' . $name . '_' . $callOffset][] = $callOffset;
+
+        $result = $instruction->result;
+        if ($result !== null) {
+            $this->emitter->storeLocal($result);
+        }
+    }
+
+    private function emitRet(Instruction $instruction): void
+    {
+        if (isset($instruction->operands[0])) {
+            $name = $this->stringOperand($instruction, 0);
+            $this->emitter->loadLocal($name);
+            $this->emitter->movReg('rax', 'rax');
+        }
+
+        // Epilogue: leave; ret
+        $this->emitter->movReg('rsp', 'rbp');
+        $this->emitter->popReg('rbp');
+        $this->emitter->ret();
     }
 
     /**
