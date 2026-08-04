@@ -95,6 +95,52 @@ class X86BackendEmitter implements BackendEmitter
                 $this->emitter->emitSeteRax();
                 $this->emitter->storeLocal($result);
                 break;
+            case 'bit_and':
+                $this->emitBinaryMath($instruction, static function (X86Emitter $emitter): void {
+                    $emitter->andRaxRdx();
+                });
+                break;
+            case 'bit_or':
+                $this->emitBinaryMath($instruction, static function (X86Emitter $emitter): void {
+                    $emitter->orRaxRdx();
+                });
+                break;
+            case 'bit_xor':
+                $this->emitBinaryMath($instruction, static function (X86Emitter $emitter): void {
+                    $emitter->xorRaxRdx();
+                });
+                break;
+            case 'bit_not':
+                $result = $this->requireResult($instruction);
+                $value = $this->stringOperand($instruction, 0);
+                $this->emitter->loadLocal($value);
+                $this->emitter->notRax();
+                $this->emitter->storeLocal($result);
+                break;
+            case 'shl':
+                $result = $this->requireResult($instruction);
+                $value = $this->stringOperand($instruction, 0);
+                $amount = $this->intOperand($instruction, 1);
+                $this->emitter->loadLocal($value);
+                $this->emitter->shlRaxImm8($amount);
+                $this->emitter->storeLocal($result);
+                break;
+            case 'shr':
+                $result = $this->requireResult($instruction);
+                $value = $this->stringOperand($instruction, 0);
+                $amount = $this->intOperand($instruction, 1);
+                $this->emitter->loadLocal($value);
+                $this->emitter->sarRaxImm8($amount);
+                $this->emitter->storeLocal($result);
+                break;
+            case 'shr_u':
+                $result = $this->requireResult($instruction);
+                $value = $this->stringOperand($instruction, 0);
+                $amount = $this->intOperand($instruction, 1);
+                $this->emitter->loadLocal($value);
+                $this->emitter->shrRaxImm8($amount);
+                $this->emitter->storeLocal($result);
+                break;
             case 'print_num':
                 $value = $this->stringOperand($instruction, 0);
                 $this->emitter->loadLocal($value);
