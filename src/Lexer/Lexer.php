@@ -54,7 +54,12 @@ class Lexer
             } elseif ($c === '+') {
                 $this->tokens[] = new Token(TokenType::PLUS, '+');
             } elseif ($c === '-') {
-                $this->tokens[] = new Token(TokenType::MINUS, '-');
+                if ($this->pos < $this->length && $this->source[$this->pos] === '>') {
+                    $this->pos++;
+                    $this->tokens[] = new Token(TokenType::ARROW, '->');
+                } else {
+                    $this->tokens[] = new Token(TokenType::MINUS, '-');
+                }
             } elseif ($c === '*') {
                 $this->tokens[] = new Token(TokenType::MULT, '*');
             } elseif ($c === '!') {
@@ -95,6 +100,14 @@ class Lexer
                 $this->tokens[] = new Token(TokenType::LBRACE, '{');
             } elseif ($c === '}') {
                 $this->tokens[] = new Token(TokenType::RBRACE, '}');
+            } elseif ($c === '(') {
+                $this->tokens[] = new Token(TokenType::LPAREN, '(');
+            } elseif ($c === ')') {
+                $this->tokens[] = new Token(TokenType::RPAREN, ')');
+            } elseif ($c === ',') {
+                $this->tokens[] = new Token(TokenType::COMMA, ',');
+            } elseif ($c === ':') {
+                $this->tokens[] = new Token(TokenType::COLON, ':');
             } elseif ($c === ';') {
                 $this->tokens[] = new Token(TokenType::SEMICOLON, ';');
             } elseif ($c === '"') {
@@ -122,6 +135,8 @@ class Lexer
                     'while' => TokenType::WHILE,
                     'if' => TokenType::IF,
                     'else' => TokenType::ELSE,
+                    'fn' => TokenType::FN,
+                    'return' => TokenType::RETURN,
                     default => TokenType::IDENTIFIER,
                 };
                 $this->tokens[] = new Token($type, $val);
