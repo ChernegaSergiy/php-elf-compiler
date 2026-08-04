@@ -6,16 +6,28 @@ namespace ChernegaSergiy\TrypilliaCompiler\Backend;
 
 use ChernegaSergiy\TrypilliaCompiler\CodeGen\Arm32Emitter;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Instruction;
+use ChernegaSergiy\TrypilliaCompiler\Midend\IrFunction;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Operand;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Program;
 use Exception;
 
 /**
  * Translates IR instructions into ARM32 emitter operations.
+ *
+ * Calling convention (AAPCS-lite):
+ *   Args: r0-r3 (first 4), return: r0
+ *   Callee-saved: r4-r11, Caller-saved: r0-r3, r12
+ *   Prologue: push {r4-r11, lr}; mov r11, sp; sub sp, sp, #localsSize; mov r10, sp
+ *   Epilogue: mov sp, r11; pop {r4-r11, pc}
  */
 class Arm32BackendEmitter implements BackendEmitter
 {
     private Arm32Emitter $emitter;
+
+    /** @var string[] Parameter names in order for the current function */
+    private array $currentParams = [];
+
+    private int $argIndex = 0;
 
     public function targetArchitecture(): Architecture
     {
@@ -27,9 +39,7 @@ class Arm32BackendEmitter implements BackendEmitter
         $this->emitter = new Arm32Emitter();
 
         foreach ($program->functions as $function) {
-            foreach ($function->instructions as $instruction) {
-                $this->emitInstruction($instruction);
-            }
+            $this->emitFunction($function);
         }
 
         foreach ($program->instructions as $instruction) {
@@ -37,6 +47,34 @@ class Arm32BackendEmitter implements BackendEmitter
         }
 
         $this->emitter->generateBinary($filename);
+    }
+
+    private function emitFunction(IrFunction $function): void
+    {
+        $this->currentParams = array_column($function->params, 'name');
+        $this->argIndex = 0;
+
+        $this->emitter->label('func_' . $function->name);
+
+        // Prologue
+        $this->emitter->pushReg('r4');
+        $this->emitter->pushReg('r5');
+        $this->emitter->pushReg('r6');
+        $this->emitter->pushReg('r7');
+        $this->emitter->pushReg('r8');
+        $this->emitter->pushReg('r9');
+        $this->emitter->pushReg('r10');
+        $this->emitter->pushReg('r11');
+        $this->emitter->pushReg('r14'); // lr
+        $this->emitter->movReg('r11', 'sp');
+        $this->emitter->movImm('r10', 256); // locals area size
+        $this->emitter->movReg('r10', 'sp'); // r10 = sp (locals base)
+
+        foreach ($function->instructions as $instruction) {
+            $this->emitInstruction($instruction);
+        }
+
+        $this->currentParams = [];
     }
 
     private function emitInstruction(Instruction $instruction): void
@@ -130,15 +168,81 @@ class Arm32BackendEmitter implements BackendEmitter
                 $this->emitter->label($label);
                 break;
             case 'func':
+                break;
             case 'end':
+                $this->emitEpilogue();
+                break;
             case 'param':
+                $this->emitParam($instruction);
+                break;
             case 'call':
+                $this->emitCall($instruction);
+                break;
             case 'arg':
+                $this->emitArg($instruction);
+                break;
             case 'ret':
+                $this->emitRet($instruction);
                 break;
             default:
                 throw new Exception('Unsupported IR opcode for ARM32 backend: ' . $instruction->opcode);
         }
+    }
+
+    private function emitParam(Instruction $instruction): void
+    {
+        if ($this->argIndex < 4) {
+            $reg = "r{$this->argIndex}";
+            $this->emitter->storeLocal($this->stringOperand($instruction, 0), $reg);
+        }
+        $this->argIndex++;
+    }
+
+    private function emitArg(Instruction $instruction): void
+    {
+        if ($this->argIndex < 4) {
+            $reg = "r{$this->argIndex}";
+            $name = $this->stringOperand($instruction, 0);
+            $this->emitter->loadLocal($name, $reg);
+        }
+        $this->argIndex++;
+    }
+
+    private function emitCall(Instruction $instruction): void
+    {
+        $name = $this->stringOperand($instruction, 0);
+        $this->argIndex = 0;
+        $this->emitter->branchLink('func_' . $name);
+
+        $result = $instruction->result;
+        if ($result !== null) {
+            $this->emitter->storeLocal($result, 'r0');
+        }
+    }
+
+    private function emitRet(Instruction $instruction): void
+    {
+        if (isset($instruction->operands[0])) {
+            $name = $this->stringOperand($instruction, 0);
+            $this->emitter->loadLocal($name, 'r0');
+        }
+        $this->emitEpilogue();
+    }
+
+    private function emitEpilogue(): void
+    {
+        // Epilogue: mov sp, r11; pop {r4-r11, pc}
+        $this->emitter->movReg('sp', 'r11');
+        $this->emitter->popReg('r14'); // lr
+        $this->emitter->popReg('r11');
+        $this->emitter->popReg('r10');
+        $this->emitter->popReg('r9');
+        $this->emitter->popReg('r8');
+        $this->emitter->popReg('r7');
+        $this->emitter->popReg('r6');
+        $this->emitter->popReg('r5');
+        $this->emitter->popReg('r4');
+        $this->emitter->ret();
     }
 
     private function emitBinaryMath(Instruction $instruction): void
