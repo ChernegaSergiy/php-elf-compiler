@@ -29,5 +29,12 @@ enum TokenType
     case SEMICOLON;
     case LBRACE;
     case RBRACE;
+    case AMP;
+    case BITOR;
+    case CARET;
+    case TILDE;
+    case SHL;
+    case SHR;
+    case SHRU;
     case EOF;
 }
