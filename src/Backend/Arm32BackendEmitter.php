@@ -75,6 +75,31 @@ class Arm32BackendEmitter implements BackendEmitter
                 $this->emitter->moveConditionFlag('r0', 'eq');
                 $this->emitter->storeLocal($result, 'r0');
                 break;
+            case 'bit_and':
+                $this->emitBinaryBitwise($instruction, 'andReg');
+                break;
+            case 'bit_or':
+                $this->emitBinaryBitwise($instruction, 'orrReg');
+                break;
+            case 'bit_xor':
+                $this->emitBinaryBitwise($instruction, 'eorReg');
+                break;
+            case 'bit_not':
+                $result = $this->requireResult($instruction);
+                $value = $this->stringOperand($instruction, 0);
+                $this->emitter->loadLocal($value, 'r0');
+                $this->emitter->mvnReg('r0', 'r0');
+                $this->emitter->storeLocal($result, 'r0');
+                break;
+            case 'shl':
+                $this->emitShift($instruction, 'lslImm');
+                break;
+            case 'shr':
+                $this->emitShift($instruction, 'asrImm');
+                break;
+            case 'shr_u':
+                $this->emitShift($instruction, 'lsrImm');
+                break;
             case 'print_num':
                 $value = $this->stringOperand($instruction, 0);
                 $this->emitter->loadLocal($value, 'r0');
@@ -112,6 +137,29 @@ class Arm32BackendEmitter implements BackendEmitter
         $this->emitter->loadLocal($left, 'r0');
         $this->emitter->loadLocal($right, 'r1');
         $this->emitter->add('r0', 'r0', 'r1');
+        $this->emitter->storeLocal($result, 'r0');
+    }
+
+    private function emitBinaryBitwise(Instruction $instruction, string $method): void
+    {
+        $result = $this->requireResult($instruction);
+        $left = $this->stringOperand($instruction, 0);
+        $right = $this->stringOperand($instruction, 1);
+
+        $this->emitter->loadLocal($left, 'r0');
+        $this->emitter->loadLocal($right, 'r1');
+        $this->emitter->$method('r0', 'r0', 'r1');
+        $this->emitter->storeLocal($result, 'r0');
+    }
+
+    private function emitShift(Instruction $instruction, string $method): void
+    {
+        $result = $this->requireResult($instruction);
+        $source = $this->stringOperand($instruction, 0);
+        $amount = $this->intOperand($instruction, 1);
+
+        $this->emitter->loadLocal($source, 'r0');
+        $this->emitter->$method('r0', 'r0', $amount);
         $this->emitter->storeLocal($result, 'r0');
     }
 
