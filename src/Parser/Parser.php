@@ -7,6 +7,7 @@ namespace ChernegaSergiy\TrypilliaCompiler\Parser;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AssignStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BinOpNode;
+use ChernegaSergiy\TrypilliaCompiler\Ast\BitNotNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\IfStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\LetStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NotNode;
@@ -21,6 +22,16 @@ use Exception;
 
 /**
  * Recursive-descent parser that turns a token stream into an AST.
+ *
+ * Expression parsing uses precedence climbing (RFC-0001 §3.4):
+ *   ~ tightest
+ *   << >> >>>
+ *   &
+ *   ^
+ *   |
+ *   + -
+ *   < >
+ *   == !=  loosest
  */
 class Parser
 {
@@ -131,29 +142,92 @@ class Parser
 
     private function parseExpr(): AstNode
     {
+        return $this->parseBinaryExpr(0);
+    }
+
+    /**
+     * Precedence climbing: parse a binary expression at the given minimum precedence.
+     */
+    private function parseBinaryExpr(int $minPrecedence): AstNode
+    {
+        $left = $this->parseUnary();
+
+        while ($this->isBinaryOp() && $this->precedence($this->peek()->type) >= $minPrecedence) {
+            $opTok = $this->consume();
+            $prec = $this->precedence($opTok->type);
+            $right = $this->parseBinaryExpr($prec + 1);
+            $left = new BinOpNode($left, $opTok->value, $right);
+        }
+
+        return $left;
+    }
+
+    private function parseUnary(): AstNode
+    {
         $tok = $this->peek();
 
         if ($tok->type === TokenType::NOT) {
             $this->consume();
-            $expr = $this->parseExpr();
+            $expr = $this->parseUnary();
 
             return new NotNode($expr);
         }
 
-        $this->consume();
-        $node = match ($tok->type) {
+        if ($tok->type === TokenType::TILDE) {
+            $this->consume();
+            $expr = $this->parseUnary();
+
+            return new BitNotNode($expr);
+        }
+
+        return $this->parsePrimary();
+    }
+
+    private function parsePrimary(): AstNode
+    {
+        $tok = $this->consume();
+
+        return match ($tok->type) {
             TokenType::NUMBER => new NumberNode((int) $tok->value),
             TokenType::STRING => new StringNode($tok->value),
             TokenType::IDENTIFIER => new VarNode($tok->value),
             default => throw new Exception('Parse error: ' . $tok->value),
         };
+    }
 
-        if (in_array($this->peek()->type, [TokenType::PLUS, TokenType::MINUS, TokenType::MULT, TokenType::LESS, TokenType::GREATER, TokenType::EQUALS, TokenType::NOTEQUALS], true)) {
-            $opTok = $this->consume();
-            $right = $this->parseExpr();
-            $node = new BinOpNode($node, $opTok->value, $right);
-        }
+    private function isBinaryOp(): bool
+    {
+        return in_array($this->peek()->type, [
+            TokenType::PLUS,
+            TokenType::MINUS,
+            TokenType::MULT,
+            TokenType::LESS,
+            TokenType::GREATER,
+            TokenType::EQUALS,
+            TokenType::NOTEQUALS,
+            TokenType::AMP,
+            TokenType::BITOR,
+            TokenType::CARET,
+            TokenType::SHL,
+            TokenType::SHR,
+            TokenType::SHRU,
+        ], true);
+    }
 
-        return $node;
+    /**
+     * Returns the precedence level of a binary operator token (higher = tighter binding).
+     */
+    private function precedence(TokenType $type): int
+    {
+        return match ($type) {
+            TokenType::BITOR => 1,
+            TokenType::CARET => 2,
+            TokenType::AMP => 3,
+            TokenType::SHL, TokenType::SHR, TokenType::SHRU => 4,
+            TokenType::PLUS, TokenType::MINUS => 5,
+            TokenType::LESS, TokenType::GREATER => 6,
+            TokenType::EQUALS, TokenType::NOTEQUALS => 7,
+            default => 0,
+        };
     }
 }
