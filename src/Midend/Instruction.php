@@ -10,7 +10,7 @@ namespace ChernegaSergiy\TrypilliaCompiler\Midend;
 class Instruction
 {
     /**
-     * @param array<int, int|string> $operands
+     * @param Operand[] $operands
      */
     public function __construct(
         public string $opcode,
