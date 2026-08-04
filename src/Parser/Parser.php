@@ -8,11 +8,14 @@ use ChernegaSergiy\TrypilliaCompiler\Ast\AssignStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BinOpNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BitNotNode;
+use ChernegaSergiy\TrypilliaCompiler\Ast\CallNode;
+use ChernegaSergiy\TrypilliaCompiler\Ast\FunctionDecl;
 use ChernegaSergiy\TrypilliaCompiler\Ast\IfStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\LetStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NotNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NumberNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\PrintStmt;
+use ChernegaSergiy\TrypilliaCompiler\Ast\ReturnStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\StringNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\VarNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\WhileStmt;
@@ -81,6 +84,14 @@ class Parser
     {
         $tok = $this->peek();
 
+        if ($tok->type === TokenType::FN) {
+            return $this->parseFunctionDecl();
+        }
+
+        if ($tok->type === TokenType::RETURN) {
+            return $this->parseReturnStmt();
+        }
+
         if ($tok->type === TokenType::LET) {
             $this->consume();
             $name = $this->expect(TokenType::IDENTIFIER)->value;
@@ -140,6 +151,58 @@ class Parser
         }
     }
 
+    private function parseFunctionDecl(): FunctionDecl
+    {
+        $this->expect(TokenType::FN);
+        $name = $this->expect(TokenType::IDENTIFIER)->value;
+        $this->expect(TokenType::LPAREN);
+
+        $params = [];
+        if ($this->peek()->type !== TokenType::RPAREN) {
+            do {
+                $paramName = $this->expect(TokenType::IDENTIFIER)->value;
+                $this->expect(TokenType::COLON);
+                $paramType = $this->expect(TokenType::IDENTIFIER)->value;
+                $params[] = ['name' => $paramName, 'type' => $paramType];
+                if ($this->peek()->type === TokenType::COMMA) {
+                    $this->consume();
+                }
+            } while ($this->peek()->type !== TokenType::RPAREN);
+        }
+        $this->expect(TokenType::RPAREN);
+
+        $returnType = 'void';
+        if ($this->peek()->type === TokenType::ARROW) {
+            $this->consume();
+            $returnType = $this->expect(TokenType::IDENTIFIER)->value;
+        }
+
+        $this->expect(TokenType::LBRACE);
+        $body = [];
+        while ($this->peek()->type !== TokenType::RBRACE) {
+            $body[] = $this->parseStmt();
+        }
+        $this->consume(); // }
+
+        return new FunctionDecl($name, $params, $returnType, $body);
+    }
+
+    private function parseReturnStmt(): ReturnStmt
+    {
+        $this->expect(TokenType::RETURN);
+
+        if ($this->peek()->type === TokenType::SEMICOLON) {
+            $this->consume();
+
+            return new ReturnStmt();
+        }
+
+        $expr = $this->parseExpr();
+        $this->expect(TokenType::SEMICOLON);
+
+        return new ReturnStmt($expr);
+    }
+
     private function parseExpr(): AstNode
     {
         return $this->parseBinaryExpr(0);
@@ -190,9 +253,30 @@ class Parser
         return match ($tok->type) {
             TokenType::NUMBER => new NumberNode((int) $tok->value),
             TokenType::STRING => new StringNode($tok->value),
-            TokenType::IDENTIFIER => new VarNode($tok->value),
+            TokenType::IDENTIFIER => $this->parseIdentifierOrCall($tok->value),
             default => throw new Exception('Parse error: ' . $tok->value),
         };
+    }
+
+    private function parseIdentifierOrCall(string $name): AstNode
+    {
+        if ($this->peek()->type === TokenType::LPAREN) {
+            $this->consume(); // (
+            $args = [];
+            if ($this->peek()->type !== TokenType::RPAREN) {
+                do {
+                    $args[] = $this->parseExpr();
+                    if ($this->peek()->type === TokenType::COMMA) {
+                        $this->consume();
+                    }
+                } while ($this->peek()->type !== TokenType::RPAREN);
+            }
+            $this->expect(TokenType::RPAREN);
+
+            return new CallNode($name, $args);
+        }
+
+        return new VarNode($name);
     }
 
     private function isBinaryOp(): bool
