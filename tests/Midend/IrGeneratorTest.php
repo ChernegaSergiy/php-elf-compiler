@@ -7,6 +7,7 @@ namespace ChernegaSergiy\TrypilliaCompiler\Tests\Midend;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Instruction;
 use ChernegaSergiy\TrypilliaCompiler\Midend\IrGenerator;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Operand;
+use ChernegaSergiy\TrypilliaCompiler\Midend\Program;
 use ChernegaSergiy\TrypilliaCompiler\Lexer\Lexer;
 use ChernegaSergiy\TrypilliaCompiler\Parser\Parser;
 use PHPUnit\Framework\TestCase;
@@ -127,5 +128,56 @@ class IrGeneratorTest extends TestCase
 
         $opcodes = array_column($instructions, 'opcode');
         $this->assertContains('shr_u', $opcodes);
+    }
+
+    public function testGeneratesParamOpcodesForFunction(): void
+    {
+        $program = $this->generateProgram('fn add(a: i64, b: i64) -> i64 { return a + b; }');
+
+        $this->assertArrayHasKey('add', $program->functions);
+        $opcodes = array_column($program->functions['add'], 'opcode');
+        $this->assertContains('param', $opcodes);
+    }
+
+    public function testGeneratesRetOpcodeForFunction(): void
+    {
+        $program = $this->generateProgram('fn add(a: i64, b: i64) -> i64 { return a + b; }');
+
+        $opcodes = array_column($program->functions['add'], 'opcode');
+        $this->assertContains('ret', $opcodes);
+    }
+
+    public function testGeneratesCallOpcode(): void
+    {
+        $instructions = $this->generateInstructions('let x = add(1, 2);');
+
+        $opcodes = array_column($instructions, 'opcode');
+        $this->assertContains('call', $opcodes);
+    }
+
+    public function testGeneratesArgOpcodes(): void
+    {
+        $instructions = $this->generateInstructions('let x = add(1, 2);');
+
+        $opcodes = array_column($instructions, 'opcode');
+        $argCount = count(array_filter($opcodes, static fn (string $op): bool => $op === 'arg'));
+        $this->assertSame(2, $argCount);
+    }
+
+    public function testMainProgramInstructionsAreSeparateFromFunctions(): void
+    {
+        $program = $this->generateProgram('fn add(a: i64, b: i64) -> i64 { return a + b; } let x = add(1, 2);');
+
+        $this->assertArrayHasKey('add', $program->functions);
+        $this->assertNotEmpty($program->instructions);
+        $mainOpcodes = array_column($program->instructions, 'opcode');
+        $this->assertContains('call', $mainOpcodes);
+    }
+
+    private function generateProgram(string $source): Program
+    {
+        $ast = (new Parser(Lexer::run($source)))->parse();
+
+        return (new IrGenerator())->generate($ast);
     }
 }
