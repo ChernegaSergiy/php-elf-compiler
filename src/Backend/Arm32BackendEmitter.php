@@ -101,6 +101,9 @@ class Arm32BackendEmitter implements BackendEmitter
             case 'add_int':
                 $this->emitBinaryMath($instruction);
                 break;
+            case 'sub_int':
+                $this->emitBinarySub($instruction);
+                break;
             case 'cmp_lt':
                 $this->emitBinaryCompare($instruction, 'lt');
                 break;
@@ -254,6 +257,18 @@ class Arm32BackendEmitter implements BackendEmitter
         $this->emitter->loadLocal($left, 'r0');
         $this->emitter->loadLocal($right, 'r1');
         $this->emitter->add('r0', 'r0', 'r1');
+        $this->emitter->storeLocal($result, 'r0');
+    }
+
+    private function emitBinarySub(Instruction $instruction): void
+    {
+        $result = $this->requireResult($instruction);
+        $left = $this->stringOperand($instruction, 0);
+        $right = $this->stringOperand($instruction, 1);
+
+        $this->emitter->loadLocal($left, 'r0');
+        $this->emitter->loadLocal($right, 'r1');
+        $this->emitter->sub('r0', 'r0', 'r1');
         $this->emitter->storeLocal($result, 'r0');
     }
 
