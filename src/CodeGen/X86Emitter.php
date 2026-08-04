@@ -79,6 +79,11 @@ class X86Emitter
         $this->text->pushRaw("\x48\x01\xD0");
     }
 
+    public function subRaxRdx(): void
+    {
+        $this->text->pushRaw("\x48\x29\xD0");
+    }
+
     public function andRaxRdx(): void
     {
         $this->text->pushRaw("\x48\x21\xD0");
