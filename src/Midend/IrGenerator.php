@@ -26,6 +26,9 @@ class IrGenerator
 
     private int $labelCounter = 0;
 
+    /** Default width for unannotated integer literals (RFC-0001 §3.1). */
+    private const DEFAULT_WIDTH = Width::I64;
+
     /**
      * @param AstNode[] $ast
      */
@@ -44,20 +47,27 @@ class IrGenerator
     {
         if ($node instanceof LetStmt || $node instanceof AssignStmt) {
             $valueTemp = $this->compileExpr($node->expr, $program);
-            $program->add(new Instruction('store_var', null, [$node->name, $valueTemp]));
+            $program->add(new Instruction('store_var', null, [
+                Operand::temp(self::DEFAULT_WIDTH, $node->name),
+                Operand::temp(self::DEFAULT_WIDTH, $valueTemp),
+            ]));
 
             return;
         }
 
         if ($node instanceof PrintStmt) {
             if ($node->expr instanceof StringNode) {
-                $program->add(new Instruction('print_str', null, [$node->expr->val]));
+                $program->add(new Instruction('print_str', null, [
+                    Operand::temp(self::DEFAULT_WIDTH, $node->expr->val),
+                ]));
 
                 return;
             }
 
             $valueTemp = $this->compileExpr($node->expr, $program);
-            $program->add(new Instruction('print_num', null, [$valueTemp]));
+            $program->add(new Instruction('print_num', null, [
+                Operand::temp(self::DEFAULT_WIDTH, $valueTemp),
+            ]));
 
             return;
         }
@@ -66,16 +76,25 @@ class IrGenerator
             $startLabel = $this->nextLabel('while_start');
             $endLabel = $this->nextLabel('while_end');
 
-            $program->add(new Instruction('label', null, [$startLabel]));
+            $program->add(new Instruction('label', null, [
+                Operand::label($startLabel),
+            ]));
             $conditionTemp = $this->compileExpr($node->condition, $program);
-            $program->add(new Instruction('jump_if_zero', null, [$conditionTemp, $endLabel]));
+            $program->add(new Instruction('jump_if_zero', null, [
+                Operand::temp(self::DEFAULT_WIDTH, $conditionTemp),
+                Operand::label($endLabel),
+            ]));
 
             foreach ($node->body as $stmt) {
                 $this->compileStmt($stmt, $program);
             }
 
-            $program->add(new Instruction('jump', null, [$startLabel]));
-            $program->add(new Instruction('label', null, [$endLabel]));
+            $program->add(new Instruction('jump', null, [
+                Operand::label($startLabel),
+            ]));
+            $program->add(new Instruction('label', null, [
+                Operand::label($endLabel),
+            ]));
 
             return;
         }
@@ -85,14 +104,21 @@ class IrGenerator
             $endLabel = $this->nextLabel('if_end');
 
             $conditionTemp = $this->compileExpr($node->condition, $program);
-            $program->add(new Instruction('jump_if_zero', null, [$conditionTemp, $elseLabel]));
+            $program->add(new Instruction('jump_if_zero', null, [
+                Operand::temp(self::DEFAULT_WIDTH, $conditionTemp),
+                Operand::label($elseLabel),
+            ]));
 
             foreach ($node->thenBody as $stmt) {
                 $this->compileStmt($stmt, $program);
             }
 
-            $program->add(new Instruction('jump', null, [$endLabel]));
-            $program->add(new Instruction('label', null, [$elseLabel]));
+            $program->add(new Instruction('jump', null, [
+                Operand::label($endLabel),
+            ]));
+            $program->add(new Instruction('label', null, [
+                Operand::label($elseLabel),
+            ]));
 
             if ($node->elseBody !== null) {
                 foreach ($node->elseBody as $stmt) {
@@ -100,7 +126,9 @@ class IrGenerator
                 }
             }
 
-            $program->add(new Instruction('label', null, [$endLabel]));
+            $program->add(new Instruction('label', null, [
+                Operand::label($endLabel),
+            ]));
 
             return;
         }
@@ -112,14 +140,18 @@ class IrGenerator
     {
         if ($node instanceof NumberNode) {
             $temp = $this->nextTemp();
-            $program->add(new Instruction('const_int', $temp, [$node->val]));
+            $program->add(new Instruction('const_int', $temp, [
+                Operand::constInt(self::DEFAULT_WIDTH, $node->val),
+            ]));
 
             return $temp;
         }
 
         if ($node instanceof VarNode) {
             $temp = $this->nextTemp();
-            $program->add(new Instruction('load_var', $temp, [$node->name]));
+            $program->add(new Instruction('load_var', $temp, [
+                Operand::temp(self::DEFAULT_WIDTH, $node->name),
+            ]));
 
             return $temp;
         }
@@ -137,7 +169,10 @@ class IrGenerator
             };
 
             $temp = $this->nextTemp();
-            $program->add(new Instruction($opcode, $temp, [$left, $right]));
+            $program->add(new Instruction($opcode, $temp, [
+                Operand::temp(self::DEFAULT_WIDTH, $left),
+                Operand::temp(self::DEFAULT_WIDTH, $right),
+            ]));
 
             return $temp;
         }
@@ -145,7 +180,9 @@ class IrGenerator
         if ($node instanceof NotNode) {
             $valueTemp = $this->compileExpr($node->expr, $program);
             $temp = $this->nextTemp();
-            $program->add(new Instruction('not_bool', $temp, [$valueTemp]));
+            $program->add(new Instruction('not_bool', $temp, [
+                Operand::temp(self::DEFAULT_WIDTH, $valueTemp),
+            ]));
 
             return $temp;
         }
