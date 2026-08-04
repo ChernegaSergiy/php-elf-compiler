@@ -44,6 +44,36 @@ class X86Emitter
         $this->text->pushRaw("\x5A");
     }
 
+    public function pushReg(string $register): void
+    {
+        $regCode = $this->x86RegCode($register);
+        $this->text->pushRaw("\x48" . chr(0x50 | $regCode));
+    }
+
+    public function popReg(string $register): void
+    {
+        $regCode = $this->x86RegCode($register);
+        $this->text->pushRaw("\x48" . chr(0x58 | $regCode));
+    }
+
+    public function callRel32(int $offset): void
+    {
+        $this->text->pushRaw("\xE8");
+        $this->text->pushU32LE($offset);
+    }
+
+    public function ret(): void
+    {
+        $this->text->pushRaw("\xC3");
+    }
+
+    public function movReg(string $dest, string $source): void
+    {
+        $destCode = $this->x86RegCode($dest);
+        $srcCode = $this->x86RegCode($source);
+        $this->text->pushRaw("\x48\x89" . chr(0xC0 | ($srcCode << 3) | $destCode));
+    }
+
     public function addRaxRdx(): void
     {
         $this->text->pushRaw("\x48\x01\xD0");
@@ -310,5 +340,20 @@ class X86Emitter
 
         file_put_contents($filename, $elfHeader . $programHeader . $prologue . $this->text->bytes() . $this->dataSection);
         chmod($filename, 0755);
+    }
+
+    private function x86RegCode(string $register): int
+    {
+        return match ($register) {
+            'rax', 'r8' => 0,
+            'rcx', 'r9' => 1,
+            'rdx', 'r10' => 2,
+            'rbx', 'r11' => 3,
+            'rsp', 'r12' => 4,
+            'rbp', 'r13' => 5,
+            'rsi', 'r14' => 6,
+            'rdi', 'r15' => 7,
+            default => throw new Exception("Unknown x86_64 register: {$register}"),
+        };
     }
 }
