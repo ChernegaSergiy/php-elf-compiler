@@ -75,6 +75,41 @@ class Arm64Emitter
         $this->operations[] = ['opcode' => 'cset', 'operands' => [$destination, $condition]];
     }
 
+    public function andReg(string $destination, string $left, string $right): void
+    {
+        $this->operations[] = ['opcode' => 'and', 'operands' => [$destination, $left, $right]];
+    }
+
+    public function orrReg(string $destination, string $left, string $right): void
+    {
+        $this->operations[] = ['opcode' => 'orr', 'operands' => [$destination, $left, $right]];
+    }
+
+    public function eorReg(string $destination, string $left, string $right): void
+    {
+        $this->operations[] = ['opcode' => 'eor', 'operands' => [$destination, $left, $right]];
+    }
+
+    public function mvnReg(string $destination, string $source): void
+    {
+        $this->operations[] = ['opcode' => 'mvn', 'operands' => [$destination, $source]];
+    }
+
+    public function lslImm(string $destination, string $source, int $amount): void
+    {
+        $this->operations[] = ['opcode' => 'lsl', 'operands' => [$destination, $source, $amount]];
+    }
+
+    public function lsrImm(string $destination, string $source, int $amount): void
+    {
+        $this->operations[] = ['opcode' => 'lsr', 'operands' => [$destination, $source, $amount]];
+    }
+
+    public function asrImm(string $destination, string $source, int $amount): void
+    {
+        $this->operations[] = ['opcode' => 'asr', 'operands' => [$destination, $source, $amount]];
+    }
+
     public function label(string $name): void
     {
         $this->operations[] = ['opcode' => 'label', 'operands' => [$name]];
@@ -187,6 +222,54 @@ class Arm64Emitter
                     $this->register((string) $operands[2]),
                 );
                 break;
+            case 'and':
+                $this->emitAnd(
+                    $this->register((string) $operands[0]),
+                    $this->register((string) $operands[1]),
+                    $this->register((string) $operands[2]),
+                );
+                break;
+            case 'orr':
+                $this->emitOrr(
+                    $this->register((string) $operands[0]),
+                    $this->register((string) $operands[1]),
+                    $this->register((string) $operands[2]),
+                );
+                break;
+            case 'eor':
+                $this->emitEor(
+                    $this->register((string) $operands[0]),
+                    $this->register((string) $operands[1]),
+                    $this->register((string) $operands[2]),
+                );
+                break;
+            case 'mvn':
+                $this->emitMvn(
+                    $this->register((string) $operands[0]),
+                    $this->register((string) $operands[1]),
+                );
+                break;
+            case 'lsl':
+                $this->emitLslImm(
+                    $this->register((string) $operands[0]),
+                    $this->register((string) $operands[1]),
+                    (int) $operands[2],
+                );
+                break;
+            case 'lsr':
+                $this->emitLsrImm(
+                    $this->register((string) $operands[0]),
+                    $this->register((string) $operands[1]),
+                    (int) $operands[2],
+                );
+                break;
+            case 'asr':
+                $this->emitAsrImm(
+                    $this->register((string) $operands[0]),
+                    $this->register((string) $operands[1]),
+                    (int) $operands[2],
+                );
+                break;
             case 'cmp':
                 $this->emitCmp(
                     $this->register((string) $operands[0]),
@@ -251,6 +334,63 @@ class Arm64Emitter
     private function emitAdd(int $destination, int $left, int $right): void
     {
         $this->emitWord32(0x8B000000 | ($right << 16) | ($left << 5) | $destination);
+    }
+
+    private function emitAnd(int $destination, int $left, int $right): void
+    {
+        // AND Xd, Xn, Xm
+        $this->emitWord32(0x8A000000 | ($right << 16) | ($left << 5) | $destination);
+    }
+
+    private function emitOrr(int $destination, int $left, int $right): void
+    {
+        // ORR Xd, Xn, Xm
+        $this->emitWord32(0xAA000000 | ($right << 16) | ($left << 5) | $destination);
+    }
+
+    private function emitEor(int $destination, int $left, int $right): void
+    {
+        // EOR Xd, Xn, Xm
+        $this->emitWord32(0xCA000000 | ($right << 16) | ($left << 5) | $destination);
+    }
+
+    private function emitMvn(int $destination, int $source): void
+    {
+        // MVN Xd, Xm = ORR Xd, XZR, Xm
+        $this->emitWord32(0xAA2003E0 | ($source << 16) | $destination);
+    }
+
+    private function emitLslImm(int $destination, int $source, int $amount): void
+    {
+        if ($amount < 0 || $amount > 63) {
+            throw new Exception("ARM64 LSL immediate out of range: {$amount}");
+        }
+        // UBFX Xd, Xn, #(-amount & 63), #(64 - amount)
+        $immr = (-$amount) & 63;
+        $imms = (64 - $amount) - 1;
+        $this->emitWord32(0xD3400000 | ($immr << 16) | ($imms << 10) | ($source << 5) | $destination);
+    }
+
+    private function emitLsrImm(int $destination, int $source, int $amount): void
+    {
+        if ($amount < 1 || $amount > 64) {
+            throw new Exception("ARM64 LSR immediate out of range: {$amount}");
+        }
+        // UBFX Xd, Xn, #amount, #(64 - amount)
+        $immr = $amount;
+        $imms = 63 - $amount;
+        $this->emitWord32(0xD3400000 | ($immr << 16) | ($imms << 10) | ($source << 5) | $destination);
+    }
+
+    private function emitAsrImm(int $destination, int $source, int $amount): void
+    {
+        if ($amount < 1 || $amount > 64) {
+            throw new Exception("ARM64 ASR immediate out of range: {$amount}");
+        }
+        // SBFX Xd, Xn, #amount, #(64 - amount)
+        $immr = $amount;
+        $imms = 63 - $amount;
+        $this->emitWord32(0x93400000 | ($immr << 16) | ($imms << 10) | ($source << 5) | $destination);
     }
 
     private function emitCmp(int $left, int $right): void
