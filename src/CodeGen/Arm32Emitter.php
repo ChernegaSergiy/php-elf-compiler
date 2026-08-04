@@ -38,13 +38,23 @@ class Arm32Emitter
      * Builds a 32-bit word from two 16-bit halves using arithmetic.
      *
      * On 32-bit PHP, hex literals >= 0x80000000 become floats and
-     * bitwise OR with floats triggers E_WARNING. Multiplication
-     * avoids this: the result may be a float on 32-bit PHP, but
-     * pack('V', ...) handles both int and float correctly.
+     * bitwise OR with floats triggers E_WARNING. Combining the two
+     * halves via multiplication doesn't avoid this: the result can
+     * still overflow PHP_INT_MAX on 32-bit builds and become a float,
+     * which pack('V', ...) cannot losslessly cast back to an int (this
+     * is what produced the "float is not representable as an int"
+     * warnings, and risked corrupting emitted bytes).
+     *
+     * Instead we never materialize the combined word as a PHP number
+     * at all: each 16-bit half is packed independently (masked to
+     * 0xFFFF so it always fits in a small positive int on any
+     * platform) and the two byte strings are concatenated in
+     * little-endian order. This is immune to int-size issues on
+     * 32-bit or 64-bit PHP alike.
      */
-    private static function w(int $hi16, int $lo16): int|float
+    private static function w(int $hi16, int $lo16): string
     {
-        return $hi16 * 0x10000 + $lo16;
+        return pack('v', $lo16 & 0xFFFF) . pack('v', $hi16 & 0xFFFF);
     }
 
     public function movImm(string $register, int $value): void
@@ -496,14 +506,14 @@ class Arm32Emitter
         }
     }
 
-    private function emitWord32(int|float $word): void
+    private function emitWord32(string $word): void
     {
-        $this->textSection .= pack('V', $word);
+        $this->textSection .= $word;
     }
 
-    private function patchWord32(int $offset, int|float $word): void
+    private function patchWord32(int $offset, string $word): void
     {
-        $this->textSection = substr_replace($this->textSection, pack('V', $word), $offset, 4);
+        $this->textSection = substr_replace($this->textSection, $word, $offset, 4);
     }
 
     private function register(string $register): int
