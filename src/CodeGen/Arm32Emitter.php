@@ -470,12 +470,12 @@ class Arm32Emitter
         }
     }
 
-    private function emitWord32(int $word): void
+    private function emitWord32(int|float $word): void
     {
         $this->textSection .= pack('V', $word);
     }
 
-    private function patchWord32(int $offset, int $word): void
+    private function patchWord32(int $offset, int|float $word): void
     {
         $this->textSection = substr_replace($this->textSection, pack('V', $word), $offset, 4);
     }
