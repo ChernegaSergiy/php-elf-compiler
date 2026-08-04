@@ -135,7 +135,7 @@ class IrGeneratorTest extends TestCase
         $program = $this->generateProgram('fn add(a: i64, b: i64) -> i64 { return a + b; }');
 
         $this->assertArrayHasKey('add', $program->functions);
-        $opcodes = array_column($program->functions['add'], 'opcode');
+        $opcodes = array_column($program->functions['add']->instructions, 'opcode');
         $this->assertContains('param', $opcodes);
     }
 
@@ -143,7 +143,7 @@ class IrGeneratorTest extends TestCase
     {
         $program = $this->generateProgram('fn add(a: i64, b: i64) -> i64 { return a + b; }');
 
-        $opcodes = array_column($program->functions['add'], 'opcode');
+        $opcodes = array_column($program->functions['add']->instructions, 'opcode');
         $this->assertContains('ret', $opcodes);
     }
 

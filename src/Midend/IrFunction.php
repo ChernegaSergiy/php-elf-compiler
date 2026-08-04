@@ -9,7 +9,7 @@ namespace ChernegaSergiy\TrypilliaCompiler\Midend;
  * and return type. Used by Program to hold multiple functions
  * separately from the main instruction stream.
  */
-class Function
+class IrFunction
 {
     /**
      * @param string $name

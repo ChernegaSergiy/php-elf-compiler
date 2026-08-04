@@ -8,7 +8,7 @@ namespace ChernegaSergiy\TrypilliaCompiler\Midend;
  * Ordered list of IR instructions emitted from the AST.
  *
  * Functions are stored separately from the main instruction stream.
- * Each function is wrapped in a Function object containing its name,
+ * Each function is wrapped in an IrFunction object containing its name,
  * parameter list, body instructions, and return type.
  * The main instruction stream follows after all function definitions.
  */
@@ -17,7 +17,7 @@ class Program
     /** @var Instruction[] */
     public array $instructions = [];
 
-    /** @var array<string, Function> Function name → Function wrapper */
+    /** @var array<string, IrFunction> Function name → IrFunction wrapper */
     public array $functions = [];
 
     public function add(Instruction $instruction): void
@@ -38,7 +38,7 @@ class Program
     public function beginFunction(string $name, array $params = [], string $returnType = 'void'): void
     {
         $this->currentFunction = $name;
-        $this->functions[$name] = new Function($name, $params, [], $returnType);
+        $this->functions[$name] = new IrFunction($name, $params, [], $returnType);
     }
 
     public function endFunction(): void
