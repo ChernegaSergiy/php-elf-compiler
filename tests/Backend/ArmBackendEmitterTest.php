@@ -7,7 +7,9 @@ namespace ChernegaSergiy\TrypilliaCompiler\Tests\Backend;
 use ChernegaSergiy\TrypilliaCompiler\Backend\Arm32BackendEmitter;
 use ChernegaSergiy\TrypilliaCompiler\Backend\Arm64BackendEmitter;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Instruction;
+use ChernegaSergiy\TrypilliaCompiler\Midend\Operand;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Program;
+use ChernegaSergiy\TrypilliaCompiler\Midend\Width;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -20,10 +22,13 @@ class ArmBackendEmitterTest extends TestCase
     private function simpleProgram(): Program
     {
         $program = new Program();
-        $program->add(new Instruction('const_int', '%1', [42]));
-        $program->add(new Instruction('store_var', null, ['x', '%1']));
-        $program->add(new Instruction('load_var', '%2', ['x']));
-        $program->add(new Instruction('print_num', null, ['%2']));
+        $program->add(new Instruction('const_int', '%1', [Operand::constInt(Width::I64, 42)]));
+        $program->add(new Instruction('store_var', null, [
+            Operand::temp(Width::I64, 'x'),
+            Operand::temp(Width::I64, '%1'),
+        ]));
+        $program->add(new Instruction('load_var', '%2', [Operand::temp(Width::I64, 'x')]));
+        $program->add(new Instruction('print_num', null, [Operand::temp(Width::I64, '%2')]));
 
         return $program;
     }
@@ -31,10 +36,13 @@ class ArmBackendEmitterTest extends TestCase
     private function negativeNumberProgram(): Program
     {
         $program = new Program();
-        $program->add(new Instruction('const_int', '%1', [-123456]));
-        $program->add(new Instruction('store_var', null, ['x', '%1']));
-        $program->add(new Instruction('load_var', '%2', ['x']));
-        $program->add(new Instruction('print_num', null, ['%2']));
+        $program->add(new Instruction('const_int', '%1', [Operand::constInt(Width::I64, -123456)]));
+        $program->add(new Instruction('store_var', null, [
+            Operand::temp(Width::I64, 'x'),
+            Operand::temp(Width::I64, '%1'),
+        ]));
+        $program->add(new Instruction('load_var', '%2', [Operand::temp(Width::I64, 'x')]));
+        $program->add(new Instruction('print_num', null, [Operand::temp(Width::I64, '%2')]));
 
         return $program;
     }
