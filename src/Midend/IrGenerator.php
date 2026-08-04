@@ -8,11 +8,14 @@ use ChernegaSergiy\TrypilliaCompiler\Ast\AssignStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\AstNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BinOpNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\BitNotNode;
+use ChernegaSergiy\TrypilliaCompiler\Ast\CallNode;
+use ChernegaSergiy\TrypilliaCompiler\Ast\FunctionDecl;
 use ChernegaSergiy\TrypilliaCompiler\Ast\IfStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\LetStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NotNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\NumberNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\PrintStmt;
+use ChernegaSergiy\TrypilliaCompiler\Ast\ReturnStmt;
 use ChernegaSergiy\TrypilliaCompiler\Ast\StringNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\VarNode;
 use ChernegaSergiy\TrypilliaCompiler\Ast\WhileStmt;
@@ -46,6 +49,41 @@ class IrGenerator
 
     private function compileStmt(AstNode $node, Program $program): void
     {
+        if ($node instanceof FunctionDecl) {
+            $program->beginFunction($node->name);
+
+            foreach ($node->params as $param) {
+                $program->add(new Instruction('param', null, [
+                    Operand::temp(self::DEFAULT_WIDTH, $param['name']),
+                ]));
+            }
+
+            foreach ($node->body as $stmt) {
+                $this->compileStmt($stmt, $program);
+            }
+
+            if (!$this->lastInstructionIsRet($program)) {
+                $program->add(new Instruction('ret', null, []));
+            }
+
+            $program->endFunction();
+
+            return;
+        }
+
+        if ($node instanceof ReturnStmt) {
+            if ($node->expr !== null) {
+                $valueTemp = $this->compileExpr($node->expr, $program);
+                $program->add(new Instruction('ret', null, [
+                    Operand::temp(self::DEFAULT_WIDTH, $valueTemp),
+                ]));
+            } else {
+                $program->add(new Instruction('ret', null, []));
+            }
+
+            return;
+        }
+
         if ($node instanceof LetStmt || $node instanceof AssignStmt) {
             $valueTemp = $this->compileExpr($node->expr, $program);
             $program->add(new Instruction('store_var', null, [
@@ -204,6 +242,22 @@ class IrGenerator
             return $temp;
         }
 
+        if ($node instanceof CallNode) {
+            foreach ($node->args as $arg) {
+                $argTemp = $this->compileExpr($arg, $program);
+                $program->add(new Instruction('arg', null, [
+                    Operand::temp(self::DEFAULT_WIDTH, $argTemp),
+                ]));
+            }
+
+            $temp = $this->nextTemp();
+            $program->add(new Instruction('call', $temp, [
+                Operand::temp(self::DEFAULT_WIDTH, $node->name),
+            ]));
+
+            return $temp;
+        }
+
         throw new Exception('Unsupported expression node: ' . $node::class);
     }
 
@@ -219,5 +273,14 @@ class IrGenerator
         $this->labelCounter++;
 
         return sprintf('%s_%d', $prefix, $this->labelCounter);
+    }
+
+    private function lastInstructionIsRet(Program $program): bool
+    {
+        $instructions = $program->isInsideFunction()
+            ? $program->functions[array_key_last($program->functions)]
+            : $program->instructions;
+
+        return $instructions !== [] && end($instructions)->opcode === 'ret';
     }
 }
