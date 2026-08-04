@@ -174,6 +174,42 @@ class IrGeneratorTest extends TestCase
         $this->assertContains('call', $mainOpcodes);
     }
 
+    public function testEmitsFuncOpcodeAtFunctionStart(): void
+    {
+        $program = $this->generateProgram('fn add(a: i64, b: i64) -> i64 { return a + b; }');
+
+        $opcodes = array_column($program->functions['add']->instructions, 'opcode');
+        $this->assertSame('func', $opcodes[0]);
+    }
+
+    public function testEmitsEndOpcodeAtFunctionEnd(): void
+    {
+        $program = $this->generateProgram('fn add(a: i64, b: i64) -> i64 { return a + b; }');
+
+        $opcodes = array_column($program->functions['add']->instructions, 'opcode');
+        $this->assertSame('end', end($opcodes));
+    }
+
+    public function testIrFunctionStoresParams(): void
+    {
+        $program = $this->generateProgram('fn add(a: i64, b: i64) -> i64 { return a + b; }');
+
+        $func = $program->functions['add'];
+        $this->assertSame('add', $func->name);
+        $this->assertCount(2, $func->params);
+        $this->assertSame('a', $func->params[0]['name']);
+        $this->assertSame('i64', $func->params[0]['type']);
+        $this->assertSame('b', $func->params[1]['name']);
+        $this->assertSame('i64', $func->params[1]['type']);
+    }
+
+    public function testIrFunctionStoresReturnType(): void
+    {
+        $program = $this->generateProgram('fn add(a: i64, b: i64) -> i64 { return a + b; }');
+
+        $this->assertSame('i64', $program->functions['add']->returnType);
+    }
+
     private function generateProgram(string $source): Program
     {
         $ast = (new Parser(Lexer::run($source)))->parse();
