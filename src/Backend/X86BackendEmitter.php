@@ -67,7 +67,7 @@ class X86BackendEmitter implements BackendEmitter
     {
         $this->argIndex = 0;
 
-        $this->emitter->label('func_' . $function->name);
+        $this->defineLabel('func_' . $function->name);
 
         // Prologue
         $this->emitter->pushReg('rbp');
