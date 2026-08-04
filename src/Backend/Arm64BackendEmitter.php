@@ -6,16 +6,26 @@ namespace ChernegaSergiy\TrypilliaCompiler\Backend;
 
 use ChernegaSergiy\TrypilliaCompiler\CodeGen\Arm64Emitter;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Instruction;
+use ChernegaSergiy\TrypilliaCompiler\Midend\IrFunction;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Operand;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Program;
 use Exception;
 
 /**
  * Translates IR instructions into ARM64 emitter operations.
+ *
+ * Calling convention (AAPCS64-lite):
+ *   Args: x0-x7 (first 8), return: x0
+ *   Callee-saved: x19-x29, Caller-saved: x0-x18
+ *   Frame pointer: x29, Link register: x30
+ *   Prologue: stp x29, x30, [sp, #-N]!; mov x29, sp
+ *   Epilogue: ldp x29, x30, [sp], #N; ret
  */
 class Arm64BackendEmitter implements BackendEmitter
 {
     private Arm64Emitter $emitter;
+
+    private int $argIndex = 0;
 
     public function targetArchitecture(): Architecture
     {
@@ -27,9 +37,7 @@ class Arm64BackendEmitter implements BackendEmitter
         $this->emitter = new Arm64Emitter();
 
         foreach ($program->functions as $function) {
-            foreach ($function->instructions as $instruction) {
-                $this->emitInstruction($instruction);
-            }
+            $this->emitFunction($function);
         }
 
         foreach ($program->instructions as $instruction) {
@@ -37,6 +45,22 @@ class Arm64BackendEmitter implements BackendEmitter
         }
 
         $this->emitter->generateBinary($filename);
+    }
+
+    private function emitFunction(IrFunction $function): void
+    {
+        $this->argIndex = 0;
+
+        $this->emitter->label('func_' . $function->name);
+
+        // Prologue: save frame pointer + link register
+        $this->emitter->pushReg('x29');
+        $this->emitter->pushReg('x30');
+        $this->emitter->movReg('x29', 'sp');
+
+        foreach ($function->instructions as $instruction) {
+            $this->emitInstruction($instruction);
+        }
     }
 
     private function emitInstruction(Instruction $instruction): void
@@ -130,15 +154,73 @@ class Arm64BackendEmitter implements BackendEmitter
                 $this->emitter->label($label);
                 break;
             case 'func':
+                break;
             case 'end':
+                $this->emitEpilogue();
+                break;
             case 'param':
+                $this->emitParam($instruction);
+                break;
             case 'call':
+                $this->emitCall($instruction);
+                break;
             case 'arg':
+                $this->emitArg($instruction);
+                break;
             case 'ret':
+                $this->emitRet($instruction);
                 break;
             default:
                 throw new Exception('Unsupported IR opcode for ARM64 backend: ' . $instruction->opcode);
         }
+    }
+
+    private function emitParam(Instruction $instruction): void
+    {
+        if ($this->argIndex < 8) {
+            $reg = "x{$this->argIndex}";
+            $this->emitter->storeLocal($this->stringOperand($instruction, 0), $reg);
+        }
+        $this->argIndex++;
+    }
+
+    private function emitArg(Instruction $instruction): void
+    {
+        if ($this->argIndex < 8) {
+            $reg = "x{$this->argIndex}";
+            $name = $this->stringOperand($instruction, 0);
+            $this->emitter->loadLocal($name, $reg);
+        }
+        $this->argIndex++;
+    }
+
+    private function emitCall(Instruction $instruction): void
+    {
+        $name = $this->stringOperand($instruction, 0);
+        $this->argIndex = 0;
+        $this->emitter->branchLink('func_' . $name);
+
+        $result = $instruction->result;
+        if ($result !== null) {
+            $this->emitter->storeLocal($result, 'x0');
+        }
+    }
+
+    private function emitRet(Instruction $instruction): void
+    {
+        if (isset($instruction->operands[0])) {
+            $name = $this->stringOperand($instruction, 0);
+            $this->emitter->loadLocal($name, 'x0');
+        }
+        $this->emitEpilogue();
+    }
+
+    private function emitEpilogue(): void
+    {
+        $this->emitter->movReg('sp', 'x29');
+        $this->emitter->popReg('x30');
+        $this->emitter->popReg('x29');
+        $this->emitter->ret();
     }
 
     private function emitBinaryMath(Instruction $instruction): void
