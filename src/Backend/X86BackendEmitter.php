@@ -47,12 +47,12 @@ class X86BackendEmitter implements BackendEmitter
         $this->labels = [];
         $this->pendingJumps = [];
 
-        foreach ($program->functions as $function) {
-            $this->emitFunction($function);
-        }
-
         foreach ($program->instructions as $instruction) {
             $this->emitInstruction($instruction);
+        }
+
+        foreach ($program->functions as $function) {
+            $this->emitFunction($function);
         }
 
         if ($this->pendingJumps !== []) {
@@ -72,6 +72,7 @@ class X86BackendEmitter implements BackendEmitter
         // Prologue
         $this->emitter->pushReg('rbp');
         $this->emitter->movReg('rbp', 'rsp');
+        $this->emitter->subRsp(0x100);
 
         foreach ($function->instructions as $instruction) {
             $this->emitInstruction($instruction);
@@ -253,9 +254,18 @@ class X86BackendEmitter implements BackendEmitter
         $name = $this->stringOperand($instruction, 0);
         $this->argIndex = 0;
 
-        $callOffset = $this->emitter->getCurrentOffset();
-        $this->emitter->callRel32(0); // placeholder
-        $this->pendingJumps['call_' . $name . '_' . $callOffset][] = $callOffset;
+        $label = 'func_' . $name;
+
+        if (isset($this->labels[$label])) {
+            $target = $this->labels[$label];
+            $callOffset = $this->emitter->getCurrentOffset();
+            $rel = $target - ($callOffset + 5);
+            $this->emitter->callRel32($rel);
+        } else {
+            $callOffset = $this->emitter->getCurrentOffset();
+            $this->emitter->callRel32(0); // placeholder
+            $this->pendingJumps[$label][] = $callOffset + 1;
+        }
 
         $result = $instruction->result;
         if ($result !== null) {
