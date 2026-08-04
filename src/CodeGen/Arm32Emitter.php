@@ -34,6 +34,19 @@ class Arm32Emitter
 
     private int $internalLabelCounter = 0;
 
+    /**
+     * Builds a 32-bit word from two 16-bit halves using arithmetic.
+     *
+     * On 32-bit PHP, hex literals >= 0x80000000 become floats and
+     * bitwise OR with floats triggers E_WARNING. Multiplication
+     * avoids this: the result may be a float on 32-bit PHP, but
+     * pack('V', ...) handles both int and float correctly.
+     */
+    private static function w(int $hi16, int $lo16): int|float
+    {
+        return $hi16 * 0x10000 + $lo16;
+    }
+
     public function movImm(string $register, int $value): void
     {
         $this->operations[] = ['opcode' => 'mov_imm', 'operands' => [$register, $value]];
@@ -104,24 +117,19 @@ class Arm32Emitter
         $this->relocations = [];
         $this->internalLabelCounter = 0;
 
-        $previous = error_reporting(E_ERROR);
-        try {
-            $stackSize = $this->alignedStackSize();
-            $this->emitPrologue($stackSize);
+        $stackSize = $this->alignedStackSize();
+        $this->emitPrologue($stackSize);
 
-            foreach ($this->operations as $operation) {
-                $this->emitOperation($operation);
-            }
-
-            $this->patchPendingJumps();
-            $this->emitExitSequence();
-
-            $entryPoint = 0x10054;
-            $dataVirtualAddress = 0x10000 + 84 + strlen($this->textSection);
-            $this->patchDataRelocations($dataVirtualAddress);
-        } finally {
-            error_reporting($previous);
+        foreach ($this->operations as $operation) {
+            $this->emitOperation($operation);
         }
+
+        $this->patchPendingJumps();
+        $this->emitExitSequence();
+
+        $entryPoint = 0x10054;
+        $dataVirtualAddress = 0x10000 + 84 + strlen($this->textSection);
+        $this->patchDataRelocations($dataVirtualAddress);
 
         $fileSize = 84 + strlen($this->textSection) + strlen($this->dataSection);
         $elfHeader = pack(
@@ -222,44 +230,44 @@ class Arm32Emitter
 
     private function emitPrologue(int $stackSize): void
     {
-        $this->emitWord32(0xE92D4800); // push {r11, lr}
-        $this->emitWord32(0xE1A0B00D); // mov r11, sp
-        $this->emitWord32(0xE24DD000 | $stackSize); // sub sp, sp, #stackSize
-        $this->emitWord32(0xE1A0A00D); // mov r10, sp
+        $this->emitWord32(self::w(0xE92D, 0x4800)); // push {r11, lr}
+        $this->emitWord32(self::w(0xE1A0, 0xB00D)); // mov r11, sp
+        $this->emitWord32(self::w(0xE24D, 0xD000 + $stackSize)); // sub sp, sp, #stackSize
+        $this->emitWord32(self::w(0xE1A0, 0xA00D)); // mov r10, sp
     }
 
     private function emitExitSequence(): void
     {
         $this->emitMovImm32(0, 0);
         $this->emitMovImm32(7, 1); // sys_exit
-        $this->emitWord32(0xEF000000); // svc 0
+        $this->emitWord32(self::w(0xEF00, 0x0000)); // svc 0
     }
 
     private function emitLoadLocal(int $register, int $offset): void
     {
         $this->assertValidLocalOffset($offset);
-        $this->emitWord32(0xE59A0000 | ($register << 12) | $offset); // ldr rt, [r10, #offset]
+        $this->emitWord32(self::w(0xE59A, ($register << 12) | $offset)); // ldr rt, [r10, #offset]
     }
 
     private function emitStoreLocal(int $register, int $offset): void
     {
         $this->assertValidLocalOffset($offset);
-        $this->emitWord32(0xE58A0000 | ($register << 12) | $offset); // str rt, [r10, #offset]
+        $this->emitWord32(self::w(0xE58A, ($register << 12) | $offset)); // str rt, [r10, #offset]
     }
 
     private function emitAdd(int $destination, int $left, int $right): void
     {
-        $this->emitWord32(0xE0800000 | ($left << 16) | ($destination << 12) | $right);
+        $this->emitWord32(self::w(0xE080 | $left, ($destination << 12) | $right));
     }
 
     private function emitCmp(int $left, int $right): void
     {
-        $this->emitWord32(0xE1500000 | ($left << 16) | $right);
+        $this->emitWord32(self::w(0xE150 | $left, $right));
     }
 
     private function emitCmpImm0(int $register): void
     {
-        $this->emitWord32(0xE3500000 | ($register << 16));
+        $this->emitWord32(self::w(0xE350 | $register, 0));
     }
 
     private function emitCmpImmRaw(int $register, int $immediate): void
@@ -267,7 +275,7 @@ class Arm32Emitter
         if ($immediate < 0 || $immediate > 255) {
             throw new Exception("ARM32 cmp immediate out of range: {$immediate}");
         }
-        $this->emitWord32(0xE3500000 | ($register << 16) | $immediate);
+        $this->emitWord32(self::w(0xE350 | $register, $immediate));
     }
 
     private function emitAddImmRaw(int $destination, int $left, int $immediate): void
@@ -275,7 +283,7 @@ class Arm32Emitter
         if ($immediate < 0 || $immediate > 255) {
             throw new Exception("ARM32 add immediate out of range: {$immediate}");
         }
-        $this->emitWord32(0xE2800000 | ($left << 16) | ($destination << 12) | $immediate);
+        $this->emitWord32(self::w(0xE280 | $left, ($destination << 12) | $immediate));
     }
 
     private function emitSubImmRaw(int $destination, int $left, int $immediate): void
@@ -283,37 +291,37 @@ class Arm32Emitter
         if ($immediate < 0 || $immediate > 255) {
             throw new Exception("ARM32 sub immediate out of range: {$immediate}");
         }
-        $this->emitWord32(0xE2400000 | ($left << 16) | ($destination << 12) | $immediate);
+        $this->emitWord32(self::w(0xE240 | $left, ($destination << 12) | $immediate));
     }
 
     private function emitSubRegRaw(int $destination, int $left, int $right): void
     {
-        $this->emitWord32(0xE0400000 | ($left << 16) | ($destination << 12) | $right);
+        $this->emitWord32(self::w(0xE040 | $left, ($destination << 12) | $right));
     }
 
     private function emitMovRegRaw(int $destination, int $source): void
     {
-        $this->emitWord32(0xE1A00000 | ($destination << 12) | $source);
+        $this->emitWord32(self::w(0xE1A0, ($destination << 12) | $source));
     }
 
     private function emitRsbImm0(int $destination, int $source): void
     {
-        $this->emitWord32(0xE2600000 | ($source << 16) | ($destination << 12));
+        $this->emitWord32(self::w(0xE260 | $source, $destination << 12));
     }
 
     private function emitUdivRaw(int $destination, int $dividend, int $divisor): void
     {
-        $this->emitWord32(0xE730F010 | ($destination << 16) | ($divisor << 8) | $dividend);
+        $this->emitWord32(self::w(0xE730 | $destination, 0xF010 | ($divisor << 8) | $dividend));
     }
 
     private function emitMls(int $destination, int $left, int $right, int $addend): void
     {
-        $this->emitWord32(0xE0600090 | ($destination << 16) | ($addend << 12) | ($right << 8) | $left);
+        $this->emitWord32(self::w(0xE060 | $destination, 0x0090 | ($addend << 12) | ($right << 8) | $left));
     }
 
     private function emitStrbRaw(int $source, int $addressRegister): void
     {
-        $this->emitWord32(0xE5C00000 | ($addressRegister << 16) | ($source << 12));
+        $this->emitWord32(self::w(0xE5C0 | $addressRegister, $source << 12));
     }
 
     private function emitMovCondition(int $destination, string $condition): void
@@ -388,7 +396,7 @@ class Arm32Emitter
 
         $this->emitMovImm32(0, 1); // stdout fd
         $this->emitMovImm32(7, 4); // sys_write
-        $this->emitWord32(0xEF000000); // svc 0
+        $this->emitWord32(self::w(0xEF00, 0x0000)); // svc 0
 
         $this->emitAddImmRaw(13, 13, $bufferSize); // add sp, sp, #bufferSize
     }
@@ -405,7 +413,7 @@ class Arm32Emitter
         $this->relocations[] = ['codeOffset' => $relocOffset, 'register' => 'r1', 'dataOffset' => $dataOffset];
         $this->emitMovImm32(2, $length);
         $this->emitMovImm32(7, 4); // sys_write
-        $this->emitWord32(0xEF000000); // svc 0
+        $this->emitWord32(self::w(0xEF00, 0x0000)); // svc 0
     }
 
     private function emitMovImm32(int $register, int $value): void
@@ -416,14 +424,23 @@ class Arm32Emitter
         $low = $value & 0xFFFF;
         $high = ($value >> 16) & 0xFFFF;
 
-        $this->emitWord32(0xE3000000 | ($register << 12) | (($low & 0xF000) << 4) | ($low & 0x0FFF)); // movw
-        $this->emitWord32(0xE3400000 | ($register << 12) | (($high & 0xF000) << 4) | ($high & 0x0FFF)); // movt
+        // movw: cond 0011 0000 imm4 Rd imm12
+        $this->emitWord32(self::w(
+            0xE300 | (($low & 0xF000) >> 12),
+            ($register << 12) | ($low & 0x0FFF),
+        ));
+        // movt: cond 0011 0100 imm4 Rd imm12
+        $this->emitWord32(self::w(
+            0xE340 | (($high & 0xF000) >> 12),
+            ($register << 12) | ($high & 0x0FFF),
+        ));
     }
 
     private function emitBranchPlaceholder(string $label, int $condition): void
     {
         $offset = strlen($this->textSection);
-        $this->emitWord32(($condition << 28) | 0x0A000000);
+        // b: cond 1010 imm24
+        $this->emitWord32(self::w(($condition << 12) | 0x0A00, 0));
         $this->pendingJumps[] = ['offset' => $offset, 'kind' => 'b', 'label' => $label, 'condition' => (string) $condition];
     }
 
@@ -451,8 +468,10 @@ class Arm32Emitter
 
             $imm24 = intdiv($deltaBytes, 4);
             $condition = (int) $jump['condition'];
-            $encoded = ($condition << 28) | 0x0A000000 | ($imm24 & 0x00FFFFFF);
-            $this->patchWord32($jump['offset'], $encoded);
+            // b: cond 1010 imm24
+            $hi16 = ($condition << 12) | 0x0A00 | (($imm24 >> 16) & 0xFF);
+            $lo16 = $imm24 & 0xFFFF;
+            $this->patchWord32($jump['offset'], self::w($hi16, $lo16));
         }
     }
 
@@ -464,23 +483,25 @@ class Arm32Emitter
             $low = $address & 0xFFFF;
             $high = ($address >> 16) & 0xFFFF;
 
+            // movw
             $this->patchWord32(
                 $relocation['codeOffset'],
-                0xE3000000 | ($register << 12) | (($low & 0xF000) << 4) | ($low & 0x0FFF)
+                self::w(0xE300 | (($low & 0xF000) >> 12), ($register << 12) | ($low & 0x0FFF)),
             );
+            // movt
             $this->patchWord32(
                 $relocation['codeOffset'] + 4,
-                0xE3400000 | ($register << 12) | (($high & 0xF000) << 4) | ($high & 0x0FFF)
+                self::w(0xE340 | (($high & 0xF000) >> 12), ($register << 12) | ($high & 0x0FFF)),
             );
         }
     }
 
-    private function emitWord32(int $word): void
+    private function emitWord32(int|float $word): void
     {
         $this->textSection .= pack('V', $word);
     }
 
-    private function patchWord32(int $offset, int $word): void
+    private function patchWord32(int $offset, int|float $word): void
     {
         $this->textSection = substr_replace($this->textSection, pack('V', $word), $offset, 4);
     }
