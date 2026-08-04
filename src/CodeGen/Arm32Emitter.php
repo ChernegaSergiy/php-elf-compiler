@@ -161,6 +161,31 @@ class Arm32Emitter
         $this->operations[] = ['opcode' => 'print_str', 'operands' => [$value]];
     }
 
+    public function pushReg(string $register): void
+    {
+        $this->operations[] = ['opcode' => 'push_reg', 'operands' => [$register]];
+    }
+
+    public function popReg(string $register): void
+    {
+        $this->operations[] = ['opcode' => 'pop_reg', 'operands' => [$register]];
+    }
+
+    public function branchLink(string $label): void
+    {
+        $this->operations[] = ['opcode' => 'bl', 'operands' => [$label]];
+    }
+
+    public function ret(): void
+    {
+        $this->operations[] = ['opcode' => 'bx_lr'];
+    }
+
+    public function movReg(string $dest, string $source): void
+    {
+        $this->operations[] = ['opcode' => 'mov_reg', 'operands' => [$dest, $source]];
+    }
+
     public function generateBinary(string $filename): void
     {
         $this->text = new ByteBuffer();
@@ -324,6 +349,24 @@ class Arm32Emitter
             case 'print_num':
                 $this->emitPrintNumber($this->register((string) $operands[0]));
                 break;
+            case 'push_reg':
+                $this->emitPushReg($this->register((string) $operands[0]));
+                break;
+            case 'pop_reg':
+                $this->emitPopReg($this->register((string) $operands[0]));
+                break;
+            case 'bl':
+                $this->emitBranchLink((string) $operands[0]);
+                break;
+            case 'bx_lr':
+                $this->emitBxLr();
+                break;
+            case 'mov_reg':
+                $this->emitMovReg(
+                    $this->register((string) $operands[0]),
+                    $this->register((string) $operands[1]),
+                );
+                break;
             default:
                 throw new Exception("Unsupported ARM32 operation: {$opcode}");
         }
@@ -354,6 +397,38 @@ class Arm32Emitter
     {
         $this->assertValidLocalOffset($offset);
         $this->emitWord32(self::w(0xE58A, ($register << 12) | $offset)); // str rt, [r10, #offset]
+    }
+
+    private function emitPushReg(int $register): void
+    {
+        // PUSH {Rn}: STMDB sp!, {Rn} = E92D 0000 | (1 << Rn)
+        $this->emitWord32(self::w(0xE92D, 1 << $register));
+    }
+
+    private function emitPopReg(int $register): void
+    {
+        // POP {Rn}: LDMIA sp!, {Rn} = E8BD 0000 | (1 << Rn)
+        $this->emitWord32(self::w(0xE8BD, 1 << $register));
+    }
+
+    private function emitBranchLink(string $label): void
+    {
+        $offset = $this->text->length();
+        // BL: cond 1011 imm24
+        $this->emitWord32(self::w(0xEB00, 0));
+        $this->pendingJumps[] = ['offset' => $offset, 'kind' => 'bl', 'label' => $label, 'condition' => '0xE'];
+    }
+
+    private function emitBxLr(): void
+    {
+        // BX LR: cond 0001 0010 1111 1111 1111 0001 0000
+        $this->emitWord32(self::w(0xE12F, 0xFF1E));
+    }
+
+    private function emitMovReg(int $dest, int $source): void
+    {
+        // MOV Rd, Rm: cond 0001 1010 0000 Rd 00000000 Rm
+        $this->emitWord32(self::w(0xE1A0, ($dest << 12) | $source));
     }
 
     private function emitAdd(int $destination, int $left, int $right): void
@@ -624,8 +699,9 @@ class Arm32Emitter
 
             $imm24 = intdiv($deltaBytes, 4);
             $condition = (int) $jump['condition'];
-            // b: cond 1010 imm24
-            $hi16 = ($condition << 12) | 0x0A00 | (($imm24 >> 16) & 0xFF);
+            // b: cond 1010 imm24, bl: cond 1011 imm24
+            $opcode = $jump['kind'] === 'bl' ? 0x0B00 : 0x0A00;
+            $hi16 = ($condition << 12) | $opcode | (($imm24 >> 16) & 0xFF);
             $lo16 = $imm24 & 0xFFFF;
             $this->patchWord32($jump['offset'], self::w($hi16, $lo16));
         }
