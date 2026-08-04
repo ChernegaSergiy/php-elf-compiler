@@ -6,6 +6,7 @@ namespace ChernegaSergiy\TrypilliaCompiler\Backend;
 
 use ChernegaSergiy\TrypilliaCompiler\CodeGen\Arm32Emitter;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Instruction;
+use ChernegaSergiy\TrypilliaCompiler\Midend\Operand;
 use ChernegaSergiy\TrypilliaCompiler\Midend\Program;
 use Exception;
 
@@ -138,21 +139,21 @@ class Arm32BackendEmitter implements BackendEmitter
 
     private function stringOperand(Instruction $instruction, int $index): string
     {
-        $value = $instruction->operands[$index] ?? null;
-        if (!is_string($value)) {
+        $operand = $instruction->operands[$index] ?? null;
+        if (!$operand instanceof Operand || !$operand->isTemp()) {
             throw new Exception("Expected string operand #{$index} for opcode: {$instruction->opcode}");
         }
 
-        return $value;
+        return (string) $operand->value;
     }
 
     private function intOperand(Instruction $instruction, int $index): int
     {
-        $value = $instruction->operands[$index] ?? null;
-        if (!is_int($value)) {
+        $operand = $instruction->operands[$index] ?? null;
+        if (!$operand instanceof Operand || !$operand->isLiteral()) {
             throw new Exception("Expected integer operand #{$index} for opcode: {$instruction->opcode}");
         }
 
-        return $value;
+        return $operand->value;
     }
 }
