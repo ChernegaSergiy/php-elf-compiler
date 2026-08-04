@@ -34,6 +34,12 @@ class X86BackendEmitter implements BackendEmitter
         $this->labels = [];
         $this->pendingJumps = [];
 
+        foreach ($program->functions as $function) {
+            foreach ($function->instructions as $instruction) {
+                $this->emitInstruction($instruction);
+            }
+        }
+
         foreach ($program->instructions as $instruction) {
             $this->emitInstruction($instruction);
         }
@@ -168,6 +174,13 @@ class X86BackendEmitter implements BackendEmitter
             case 'label':
                 $label = $this->stringOperand($instruction, 0);
                 $this->defineLabel($label);
+                break;
+            case 'func':
+            case 'end':
+            case 'param':
+            case 'call':
+            case 'arg':
+            case 'ret':
                 break;
             default:
                 throw new Exception('Unsupported IR opcode for x86 backend: ' . $instruction->opcode);
