@@ -72,4 +72,60 @@ class IrGeneratorTest extends TestCase
         $this->assertContains('jump', $opcodes);
         $this->assertContains('print_str', $opcodes);
     }
+
+    public function testGeneratesBitwiseAndOpcode(): void
+    {
+        $instructions = $this->generateInstructions('let x = a & b;');
+
+        $opcodes = array_column($instructions, 'opcode');
+        $this->assertContains('bit_and', $opcodes);
+    }
+
+    public function testGeneratesBitwiseOrOpcode(): void
+    {
+        $instructions = $this->generateInstructions('let x = a | b;');
+
+        $opcodes = array_column($instructions, 'opcode');
+        $this->assertContains('bit_or', $opcodes);
+    }
+
+    public function testGeneratesBitwiseXorOpcode(): void
+    {
+        $instructions = $this->generateInstructions('let x = a ^ b;');
+
+        $opcodes = array_column($instructions, 'opcode');
+        $this->assertContains('bit_xor', $opcodes);
+    }
+
+    public function testGeneratesBitwiseNotOpcode(): void
+    {
+        $instructions = $this->generateInstructions('let x = ~a;');
+
+        $opcodes = array_column($instructions, 'opcode');
+        $this->assertContains('bit_not', $opcodes);
+    }
+
+    public function testGeneratesShiftLeftOpcode(): void
+    {
+        $instructions = $this->generateInstructions('let x = a << b;');
+
+        $opcodes = array_column($instructions, 'opcode');
+        $this->assertContains('shl', $opcodes);
+    }
+
+    public function testGeneratesShiftRightOpcode(): void
+    {
+        $instructions = $this->generateInstructions('let x = a >> b;');
+
+        $opcodes = array_column($instructions, 'opcode');
+        $this->assertContains('shr', $opcodes);
+    }
+
+    public function testGeneratesUnsignedShiftRightOpcode(): void
+    {
+        $instructions = $this->generateInstructions('let x = a >>> b;');
+
+        $opcodes = array_column($instructions, 'opcode');
+        $this->assertContains('shr_u', $opcodes);
+    }
 }
