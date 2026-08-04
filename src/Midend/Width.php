@@ -77,15 +77,15 @@ enum Width: string
      */
     public function fits(int $value): bool
     {
-        $bits = $this->bits();
-
-        if ($this->isSigned()) {
-            $min = -(1 << ($bits - 1));
-            $max = (1 << ($bits - 1)) - 1;
-
-            return $value >= $min && $value <= $max;
-        }
-
-        return $value >= 0 && $value <= (1 << $bits) - 1;
+        return match ($this) {
+            self::I8 => $value >= -128 && $value <= 127,
+            self::U8 => $value >= 0 && $value <= 255,
+            self::I16 => $value >= -32768 && $value <= 32767,
+            self::U16 => $value >= 0 && $value <= 65535,
+            self::I32 => $value >= -2147483648 && $value <= 2147483647,
+            self::U32 => $value >= 0 && $value <= 4294967295,
+            self::I64 => true,
+            self::U64 => $value >= 0,
+        };
     }
 }
