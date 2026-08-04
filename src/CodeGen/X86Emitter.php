@@ -49,6 +49,44 @@ class X86Emitter
         $this->text->pushRaw("\x48\x01\xD0");
     }
 
+    public function andRaxRdx(): void
+    {
+        $this->text->pushRaw("\x48\x21\xD0");
+    }
+
+    public function orRaxRdx(): void
+    {
+        $this->text->pushRaw("\x48\x09\xD0");
+    }
+
+    public function xorRaxRdx(): void
+    {
+        $this->text->pushRaw("\x48\x31\xD0");
+    }
+
+    public function notRax(): void
+    {
+        $this->text->pushRaw("\x48\xF7\xD0");
+    }
+
+    public function shlRaxImm8(int $imm): void
+    {
+        $this->text->pushRaw("\x48\xC1\xE0");
+        $this->text->pushU8($imm);
+    }
+
+    public function shrRaxImm8(int $imm): void
+    {
+        $this->text->pushRaw("\x48\xC1\xE8");
+        $this->text->pushU8($imm);
+    }
+
+    public function sarRaxImm8(int $imm): void
+    {
+        $this->text->pushRaw("\x48\xC1\xF8");
+        $this->text->pushU8($imm);
+    }
+
     public function storeLocal(string $name): void
     {
         if (!isset($this->symbols[$name])) {
