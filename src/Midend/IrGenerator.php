@@ -205,6 +205,7 @@ class IrGenerator
 
             $opcode = match ($node->op) {
                 '+' => 'add_int',
+                '-' => 'sub_int',
                 '<' => 'cmp_lt',
                 '==' => 'cmp_eq',
                 '!=' => 'cmp_ne',
