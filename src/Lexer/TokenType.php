@@ -36,5 +36,12 @@ enum TokenType
     case SHL;
     case SHR;
     case SHRU;
+    case FN;
+    case RETURN;
+    case COMMA;
+    case COLON;
+    case LPAREN;
+    case RPAREN;
+    case ARROW;
     case EOF;
 }
