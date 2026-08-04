@@ -111,4 +111,74 @@ class LexerTest extends TestCase
             array_map(static fn ($token) => $token->type, $tokens),
         );
     }
+
+    public function testTokenizesBitwiseAnd(): void
+    {
+        $tokens = Lexer::run('a & b');
+
+        $this->assertSame(
+            [TokenType::IDENTIFIER, TokenType::AMP, TokenType::IDENTIFIER, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
+
+    public function testTokenizesBitwiseOr(): void
+    {
+        $tokens = Lexer::run('a | b');
+
+        $this->assertSame(
+            [TokenType::IDENTIFIER, TokenType::BITOR, TokenType::IDENTIFIER, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
+
+    public function testTokenizesBitwiseXor(): void
+    {
+        $tokens = Lexer::run('a ^ b');
+
+        $this->assertSame(
+            [TokenType::IDENTIFIER, TokenType::CARET, TokenType::IDENTIFIER, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
+
+    public function testTokenizesBitwiseNot(): void
+    {
+        $tokens = Lexer::run('~a');
+
+        $this->assertSame(
+            [TokenType::TILDE, TokenType::IDENTIFIER, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
+
+    public function testTokenizesShiftLeft(): void
+    {
+        $tokens = Lexer::run('a << b');
+
+        $this->assertSame(
+            [TokenType::IDENTIFIER, TokenType::SHL, TokenType::IDENTIFIER, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
+
+    public function testTokenizesShiftRight(): void
+    {
+        $tokens = Lexer::run('a >> b');
+
+        $this->assertSame(
+            [TokenType::IDENTIFIER, TokenType::SHR, TokenType::IDENTIFIER, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
+
+    public function testTokenizesUnsignedShiftRight(): void
+    {
+        $tokens = Lexer::run('a >>> b');
+
+        $this->assertSame(
+            [TokenType::IDENTIFIER, TokenType::SHRU, TokenType::IDENTIFIER, TokenType::EOF],
+            array_map(static fn ($token) => $token->type, $tokens),
+        );
+    }
 }
