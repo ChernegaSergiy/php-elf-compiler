@@ -62,6 +62,12 @@ class X86Emitter
         $this->text->pushU32LE($offset);
     }
 
+    public function subRsp(int $bytes): void
+    {
+        $this->text->pushRaw("\x48\x81\xEC");
+        $this->text->pushU32LE($bytes);
+    }
+
     public function ret(): void
     {
         $this->text->pushRaw("\xC3");
